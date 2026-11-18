@@ -1,14 +1,19 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { downloadDrill } from '../app/share'
 import { drillHash, libraryHash } from '../app/route'
 import { Issues } from '../app/Issues'
 import { parseDrill } from '../engine/parse'
 import { initialState, planDrill } from '../engine/plan'
 import type { ActorType, Drill, MoveStyle, Point } from '../engine/types'
-import { Timeline } from '../flow/TimelineView'
+import { editViaFlow } from '../flow/apply'
+import { moveLanding, moveRelease, removeWait, setRunSeconds, setWaitSeconds, type Starts } from '../flow/edit'
+import { segmentsFor } from '../flow/timeline'
+import type { Flow } from '../flow/types'
+import { Timeline, type DragPhase } from '../flow/TimelineView'
 import { libraryDrills } from '../library/drills'
 import { Player } from '../player/Player'
 import { ActorPanel } from './ActorPanel'
+import { PiecePanel } from './PiecePanel'
 import { deleteDraft, loadDraft } from './drafts'
 import { DetailsPanel } from './DetailsPanel'
 import { EditStage } from './EditStage'
@@ -51,6 +56,9 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
   const [drawing, setDrawing] = useState<Drawing | null>(null)
   const [message, setMessage] = useState('')
   const [previewing, setPreviewing] = useState(false)
+  // The drill as it was when a timeline drag began: every step of the drag is
+  // worked out from it, so the result depends only on where the pointer is now.
+  const dragBase = useRef<Drill | null>(null)
 
   // Steps can be deleted from under the view; never point past the end.
   const step = view === null || drill.steps.length === 0 ? null : Math.min(view, drill.steps.length - 1)
@@ -120,6 +128,40 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
     else stopDrawing()
   }
 
+  /**
+   * Apply an edit made on the timeline. The drill is turned into its flow, the
+   * flow is edited, and the result is compiled back into steps; an edit that
+   * would break something (a receiver arriving before the pass leaves, a run
+   * starting while a pass is in the air) is refused with the reason.
+   */
+  const flowEdit = (edit: (flow: Flow, starts: Starts) => Flow | null, phase: DragPhase | 'once' = 'once') => {
+    const base = phase === 'move' ? dragBase.current : drill
+    if (!base) return
+    const result = editViaFlow(base, edit)
+    if (!result) {
+      setMessage('That change is not possible here: it would need a speed nobody skates, or something that is not on the timeline.')
+      return
+    }
+    if (result.added.length > 0) {
+      // The most specific reason first: "the receiver arrives before the pass leaves"
+      // says more than the validator's resulting complaint about the puck.
+      const reason = result.added.find((p) => p.code !== 'drill-invalid') ?? result.added[0]
+      setMessage(reason.message)
+      return
+    }
+    setMessage('')
+    if (phase === 'move') editor.preview(result.drill)
+    else editor.edit(result.drill)
+  }
+
+  const timelineDrag = (phase: DragPhase, edit: (flow: Flow, starts: Starts) => Flow | null) => {
+    if (phase === 'start') dragBase.current = drill
+    else if (phase === 'end') {
+      dragBase.current = null
+      editor.endGesture()
+    } else flowEdit(edit, 'move')
+  }
+
   // Keyboard: undo/redo, finish/cancel, delete, nudge. Ignored while typing in a field.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -148,6 +190,9 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
           e.preventDefault()
           editor.edit(deleteMove(drill, selection.step, selection.actor))
           setSelection(null)
+        } else if (selection?.kind === 'piece') {
+          e.preventDefault()
+          flowEdit((f, s) => removeWait(f, s, selection.actor, selection.piece))
         }
       } else if (selectedActor && step === null && e.key.startsWith('Arrow')) {
         e.preventDefault()
@@ -298,7 +343,24 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
             }}
             onVertexDragEnd={editor.endGesture}
           />
-            <Timeline drill={drill} />
+            <Timeline
+              drill={drill}
+              editing={{
+                selected: selection?.kind === 'piece' ? { actor: selection.actor, piece: selection.piece } : null,
+                onSelect: (piece) => setSelection(piece ? { kind: 'piece', ...piece } : null),
+                onResize: (actor, piece, t, phase) =>
+                  timelineDrag(phase, (flow, starts) => {
+                    const list = flow.paths[actor]
+                    const seg = list && segmentsFor(list, starts[actor])[piece]
+                    if (!seg) return null
+                    return seg.piece.kind === 'wait'
+                      ? setWaitSeconds(flow, starts, actor, piece, t - seg.t0)
+                      : setRunSeconds(flow, starts, actor, piece, t - seg.t0)
+                  }),
+                onMoveEnd: (link, which, t, phase) =>
+                  timelineDrag(phase, (flow, starts) => (which === 'from' ? moveRelease(flow, starts, link, t) : moveLanding(flow, starts, link, t))),
+              }}
+            />
           </div>
           <aside className="panels">
             {selectedActor && <ActorPanel key={selectedActor.id} drill={drill} actor={selectedActor} onEdit={editor.edit} />}
@@ -319,6 +381,9 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
                 issues={result.issues}
                 onApply={(issue, choice) => editor.edit(applySuggestion(drill, issue.location, choice))}
               />
+            )}
+            {selection?.kind === 'piece' && (
+              <PiecePanel key={`${selection.actor}-${selection.piece}`} drill={drill} actor={selection.actor} piece={selection.piece} onEdit={(edit) => flowEdit(edit)} />
             )}
             <SmoothnessPanel
               drill={drill}
