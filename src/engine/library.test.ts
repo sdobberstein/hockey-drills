@@ -20,6 +20,16 @@ describe('drill library', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
+  it('gives each drill in a progression a unique position', () => {
+    const seen = new Set<string>()
+    for (const [, d] of entries) {
+      if (!d.progression) continue
+      const key = `${d.progression.series}#${d.progression.order}`
+      expect(seen.has(key), `duplicate progression slot ${key}`).toBe(false)
+      seen.add(key)
+    }
+  })
+
   for (const [path, drill] of entries) {
     describe(path, () => {
       it('is named after its id', () => {

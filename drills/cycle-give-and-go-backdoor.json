@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "id": "cycle-give-and-go-backdoor",
+  "title": "Cycle Give and Go: Backdoor",
+  "description": "Variation of Cycle Give and Go. F3 times a run in from the far side so they arrive on the backdoor. F2 passes to F1, who one-touches it over to F3 for the shot.",
+  "tags": ["passing", "shooting", "cycle"],
+  "rink": "half-right",
+  "progression": { "series": "cycle-give-and-go", "order": 2 },
+  "actors": [
+    { "id": "F1", "type": "forward", "label": "1", "start": [191, 78] },
+    { "id": "F2", "type": "forward", "label": "2", "start": [128, 78] },
+    { "id": "F3", "type": "forward", "label": "3", "start": [192, 10] },
+    { "id": "puck", "type": "puck", "start": [191, 78], "carriedBy": "F1" }
+  ],
+  "steps": [
+    {
+      "name": "Walk the boards",
+      "moves": [
+        { "actor": "F1", "style": "skate-puck", "points": [[191, 78], [172, 79]] },
+        { "actor": "F2", "style": "skate", "points": [[128, 78], [166, 79]] }
+      ]
+    },
+    {
+      "name": "Bump pass",
+      "moves": [{ "actor": "puck", "style": "pass", "to": "F2" }]
+    },
+    {
+      "name": "Around the circle",
+      "moves": [
+        { "actor": "F1", "style": "skate", "points": [[172, 79], [160, 77], [154.5, 72.4], [148.8, 62], [149.4, 55], [157, 50]] },
+        { "actor": "F2", "style": "skate-puck", "speed": 12, "points": [[166, 79], [172, 79], [178, 73], [185, 66]] }
+      ]
+    },
+    {
+      "name": "Give and go",
+      "notes": "F3 times the run so they arrive on the backdoor as the pass reaches F1.",
+      "moves": [
+        { "actor": "puck", "style": "pass", "to": "F1" },
+        { "actor": "F3", "style": "skate", "points": [[192, 10], [188, 20], [179, 31]] }
+      ]
+    },
+    {
+      "name": "One-touch",
+      "moves": [{ "actor": "puck", "style": "pass", "to": "F3" }]
+    },
+    {
+      "name": "Shot",
+      "moves": [{ "actor": "puck", "style": "shoot", "to": [189, 42.5] }]
+    }
+  ]
+}
