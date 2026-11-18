@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { drillHash, libraryHash, parseHash, sharedHash } from './route'
+import { drillHash, editHash, libraryHash, newHash, parseHash, sharedHash } from './route'
 
 describe('routes', () => {
   it('shows the library for empty and unknown hashes', () => {
@@ -20,6 +20,18 @@ describe('routes', () => {
     expect(parseHash(libraryHash())).toEqual({ kind: 'library' })
     expect(parseHash(drillHash('cycle-give-and-go'))).toEqual({ kind: 'drill', id: 'cycle-give-and-go' })
     expect(parseHash(sharedHash('Zm9v'))).toEqual({ kind: 'shared', data: 'Zm9v' })
+  })
+
+  it('reads the editor routes', () => {
+    expect(parseHash('#/edit/2-on-1')).toEqual({ kind: 'edit', id: '2-on-1' })
+    expect(parseHash('#/new')).toEqual({ kind: 'new' })
+    expect(parseHash(editHash('my drill'))).toEqual({ kind: 'edit', id: 'my drill' })
+    expect(parseHash(newHash())).toEqual({ kind: 'new' })
+  })
+
+  it('falls back to the library for an edit route with no id', () => {
+    expect(parseHash('#/edit/')).toEqual({ kind: 'library' })
+    expect(parseHash('#/edit')).toEqual({ kind: 'library' })
   })
 
   it('survives a malformed percent escape', () => {
