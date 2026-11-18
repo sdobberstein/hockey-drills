@@ -23,12 +23,18 @@ export interface VertexGrab {
 
 export type StagePhase = 'start' | 'move' | 'end'
 
+/** What a click landed on while a pass tool is chosen. */
+export type PassClick =
+  | { kind: 'path'; actor: string; point: Point }
+  | { kind: 'actor'; id: string }
+  | { kind: 'ice'; point: Point }
+
 interface Props {
   drill: Drill
   flow: Flow
   starts: Starts
-  /** Passes and shots, drawn faint for context. */
-  flights: readonly { style: MoveStyle; path: readonly Point[] }[]
+  /** Passes and shots, in the order they happen; faint for context, and clickable to select. */
+  flights: readonly { index: number; style: MoveStyle; path: readonly Point[] }[]
   selection: Selection
   armed: ActorType | null
   /** A run style is chosen: clicking a skater starts a run for them. */
@@ -39,6 +45,11 @@ interface Props {
   onActorDrag: (id: string, to: Point) => void
   onActorDragEnd: () => void
   onRunStart: (actor: string) => void
+  /** A pass tool is chosen: clicks pick where a pass leaves and lands. */
+  passTool: boolean
+  /** Where the pass being linked leaves, once that is chosen: drawn with a line to the pointer. */
+  passFrom: Point | null
+  onPassClick: (click: PassClick) => void
   onDrawPoint: (at: Point, onActor?: string) => void
   onFinishDrawing: () => void
   onVertex: (grab: VertexGrab, to: Point, phase: StagePhase) => void
@@ -59,7 +70,7 @@ const pointsAttr = (pts: readonly Point[]) => pts.map(([x, y]) => `${x},${y}`).j
  * there are no steps here to be "in", only paths.
  */
 export function FlowStage(props: Props) {
-  const { drill, flow, starts, flights, selection, armed, routeTool, drawing } = props
+  const { drill, flow, starts, flights, selection, armed, routeTool, drawing, passTool, passFrom } = props
   const svgRef = useRef<SVGSVGElement>(null)
   const grab = useRef<{ id: string; dx: number; dy: number } | null>(null)
   const vertex = useRef<VertexGrab | null>(null)
@@ -88,7 +99,7 @@ export function FlowStage(props: Props) {
   const ordered = [...drill.actors].sort((a, b) => Number(a.type === 'puck') - Number(b.type === 'puck'))
   const aspect = viewAspect(drill.rink)
   const drawingNow = drawing !== null
-  const busy = drawingNow || armed !== null || routeTool
+  const busy = drawingNow || armed !== null || routeTool || passTool
 
   const startVertex = (e: React.PointerEvent, g: VertexGrab) => {
     e.stopPropagation()
@@ -107,12 +118,13 @@ export function FlowStage(props: Props) {
       style={{ aspectRatio: aspect, width: `min(100%, calc(70vh * ${aspect}))` }}
       onPointerDown={(e) => {
         if (drawingNow) props.onDrawPoint(toFeet(e))
+        else if (passTool) props.onPassClick({ kind: 'ice', point: toFeet(e) })
         else if (armed) props.onPlace(toFeet(e))
         else props.onSelect(null)
       }}
       onPointerMove={(e) => {
         if (vertex.current) props.onVertex(vertex.current, toFeet(e), 'move')
-        else if (drawingNow) setCursor(toFeet(e))
+        else if (drawingNow || passFrom) setCursor(toFeet(e))
       }}
       onPointerUp={(e) => {
         if (!vertex.current) return
@@ -126,9 +138,29 @@ export function FlowStage(props: Props) {
       <Rink />
 
       {/* Passes and shots, faint, so the paths can be read against them. */}
-      {flights.map((f, i) => (
-        <MoveLine key={`f${i}`} style={f.style} path={f.path} opacity={0.3} />
-      ))}
+      {flights.map((f) => {
+        const chosen = selection?.kind === 'pass' && selection.link === f.index
+        return (
+          <g key={`f${f.index}`}>
+            {chosen && (
+              <polyline points={pointsAttr(f.path)} fill="none" stroke={ACCENT} strokeOpacity={0.3} strokeWidth={3} strokeLinejoin="round" pointerEvents="none" />
+            )}
+            <MoveLine style={f.style} path={f.path} opacity={chosen ? 1 : 0.35} />
+            <polyline
+              points={pointsAttr(f.path)}
+              fill="none"
+              stroke="transparent"
+              strokeWidth={3}
+              pointerEvents={busy ? 'none' : 'stroke'}
+              style={{ cursor: 'pointer' }}
+              onPointerDown={(e) => {
+                e.stopPropagation()
+                props.onSelect({ kind: 'pass', link: f.index })
+              }}
+            />
+          </g>
+        )
+      })}
 
       {/* Each skater's runs. */}
       {[...segments].flatMap(([actor, list]) =>
@@ -146,12 +178,21 @@ export function FlowStage(props: Props) {
                 style={{ cursor: 'pointer' }}
                 onPointerDown={(e) => {
                   e.stopPropagation()
-                  props.onSelect({ kind: 'piece', actor, piece: seg.index })
+                  if (passTool) props.onPassClick({ kind: 'path', actor, point: toFeet(e) })
+                  else props.onSelect({ kind: 'piece', actor, piece: seg.index })
                 }}
               />
             </g>
           ) : null,
         ),
+      )}
+
+      {/* The pass being linked: where it leaves, and a dashed line to the pointer. */}
+      {passFrom && (
+        <g pointerEvents="none" fill="none" stroke="#b3541e" strokeWidth={0.5} strokeLinecap="round">
+          {cursor && <line x1={passFrom[0]} y1={passFrom[1]} x2={cursor[0]} y2={cursor[1]} strokeDasharray="1.2 0.9" />}
+          <circle cx={passFrom[0]} cy={passFrom[1]} r={1.3} fill="#b3541e" stroke="#fff" strokeWidth={0.4} />
+        </g>
       )}
 
       {/* A halo under the selected run. */}
@@ -247,6 +288,10 @@ export function FlowStage(props: Props) {
               e.stopPropagation()
               if (drawingNow) {
                 props.onDrawPoint(frame[actor.id] ?? [x, y], actor.id)
+                return
+              }
+              if (passTool) {
+                props.onPassClick({ kind: 'actor', id: actor.id })
                 return
               }
               if (routeTool) {

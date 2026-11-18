@@ -61,15 +61,21 @@ export function RouteTools({ armed, drawing, onArm, releases = true, flow = fals
           <h3>Pass or shoot</h3>
           <StyleButtons styles={RELEASE_STYLES} armed={armed} onArm={onArm} />
           <p className="hint">
-            {drawing
-              ? releasing
-                ? 'Click where it goes, or click a teammate. Click several points to bank it off the boards, then double-click.'
-                : 'Click to add points. Double-click or press Enter to finish. Esc cancels.'
-              : armed
+            {flow
+              ? drawing
+                ? 'Now click where it lands: the receiver\'s path, a skater (it lands where their run ends), or the ice. Esc cancels.'
+                : armed
+                  ? 'Click the passer\'s path at the point where the pass leaves.'
+                  : 'Pick a style, then click a path.'
+              : drawing
                 ? releasing
-                  ? 'Now click the player with the puck.'
-                  : 'Now click the player to start from.'
-                : 'Pick a style, then click the player.'}
+                  ? 'Click where it goes, or click a teammate. Click several points to bank it off the boards, then double-click.'
+                  : 'Click to add points. Double-click or press Enter to finish. Esc cancels.'
+                : armed
+                  ? releasing
+                    ? 'Now click the player with the puck.'
+                    : 'Now click the player to start from.'
+                  : 'Pick a style, then click the player.'}
           </p>
         </section>
       ) : (

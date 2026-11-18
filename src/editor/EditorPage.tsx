@@ -9,17 +9,21 @@ import { editViaFlow } from '../flow/apply'
 import { moveLanding, moveRelease, removeWait, setRunSeconds, setWaitSeconds, type Starts } from '../flow/edit'
 import { drillToFlow } from '../flow/import'
 import { appendRun, pathEnd, removeRun, setRunPoints } from '../flow/pathEdit'
+import { addPass, endMarker, locateOnPath, removePass, followers } from '../flow/passEdit'
+import { buildTimelineModel, carrierAtTime, puckCarriedBy } from '../flow/view'
+import type { After, EventTarget, Marker } from '../flow/types'
 import { segmentsFor } from '../flow/timeline'
 import type { Flow } from '../flow/types'
 import { Timeline, type DragPhase } from '../flow/TimelineView'
 import { libraryDrills } from '../library/drills'
 import { Player } from '../player/Player'
 import { ActorPanel } from './ActorPanel'
+import { PassPanel } from './PassPanel'
 import { PiecePanel } from './PiecePanel'
 import { deleteDraft, loadDraft } from './drafts'
 import { DetailsPanel } from './DetailsPanel'
 import { EditStage } from './EditStage'
-import { FlowStage, type StagePhase, type VertexGrab } from './FlowStage'
+import { FlowStage, type PassClick, type StagePhase, type VertexGrab } from './FlowStage'
 import { addActor, deleteActor, moveActor } from './ops'
 import { clampToRink } from './rink'
 import { addRelease, applySuggestion, deleteMove, findMove, RELEASE_STYLES, reshapeRoute, setLanding, tieToRunEnd } from './releases'
@@ -61,6 +65,8 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
   const [previewing, setPreviewing] = useState(false)
   // Two ways to work on the same drill: step by step, or as one path per skater.
   const [mode, setMode] = useState<'steps' | 'flow'>('steps')
+  // A pass being linked in the flow view, after its first click (where it leaves).
+  const [passDraft, setPassDraft] = useState<{ puck: string; from: Marker | After; carrier: string; time: number; point: Point } | null>(null)
   // The drill as it was when a timeline drag began: every step of the drag is
   // worked out from it, so the result depends only on where the pointer is now.
   const dragBase = useRef<Drill | null>(null)
@@ -79,9 +85,13 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
   const starts = useMemo<Starts>(() => Object.fromEntries(drill.actors.map((a) => [a.id, a.start])), [drill])
   // Passes and shots, shown faint under the paths in the flow view.
   const flights = useMemo(
-    () => (plan?.steps ?? []).flatMap((s) => s.moves.filter((m) => m.releases).map((m) => ({ style: m.style, path: m.path }))),
+    () =>
+      (plan?.steps ?? [])
+        .flatMap((s) => s.moves.filter((m) => m.releases))
+        .map((m, index) => ({ index, style: m.style, path: m.path })),
     [plan],
   )
+  const model = useMemo(() => buildTimelineModel(drill), [drill])
   const positions = useMemo(() => {
     const at = step !== null && plan?.steps[step] ? plan.steps[step].before.positions : initialState(drill).positions
     return Object.fromEntries(at)
@@ -97,6 +107,7 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
 
   const stopDrawing = () => {
     setDrawing(null)
+    setPassDraft(null)
     setRouteStyle(null)
   }
   const goTo = (next: number | null) => {
@@ -188,6 +199,82 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
     if (last >= 0) setSelection({ kind: 'piece', actor, piece: last })
   }
 
+  /**
+   * The two clicks that link a pass in the flow view: where it leaves (on the
+   * passer's path), then where it lands (on the receiver's path, on a skater, or
+   * on the ice). Everything else, the speed included, follows from those.
+   */
+  const onPassClick = (hit: PassClick) => {
+    if (!flow || !model || routeStyle === null) return
+    const style = routeStyle
+
+    if (!passDraft) {
+      if (hit.kind === 'ice') {
+        setMessage('Click on a skater\'s path where the pass should leave.')
+        return
+      }
+      const actor = hit.kind === 'path' ? hit.actor : hit.id
+      let marker: Marker
+      let time: number
+      let point: Point
+      if (hit.kind === 'path') {
+        const located = locateOnPath(flow, starts, actor, hit.point)
+        if (!located) return
+        marker = located.marker
+        time = located.time
+        point = hit.point
+      } else {
+        // Clicking the skater themselves means from where they start.
+        if (!flow.paths[actor]?.length) {
+          setMessage(`${actor} has no path yet. Draw a run for them, then click it where the pass should leave.`)
+          return
+        }
+        marker = { actor, piece: 0, at: 0 }
+        time = 0
+        point = starts[actor]
+      }
+
+      const puck = puckCarriedBy(model, actor, time)
+      if (!puck) {
+        const holder = model.pucks.map((p) => carrierAtTime(model, p.actor, time)).find(Boolean)
+        setMessage(holder ? `${actor} does not have the puck at ${time.toFixed(2)} s; ${holder} does.` : `Nobody has the puck at ${time.toFixed(2)} s: it is in the air or loose.`)
+        return
+      }
+      // At the instant a pass lands on this skater, it is a release taken as the puck arrives.
+      const fed = model.links.findIndex((l, j) => flow.events[j]?.puck === puck && l.to.actor === actor && Math.abs(l.to.t - time) <= 0.15)
+      setMessage('')
+      setSelection(null)
+      setPassDraft({ puck, from: fed >= 0 ? { after: fed } : marker, carrier: actor, time, point })
+      return
+    }
+
+    // Second click: where it lands.
+    let target: EventTarget
+    if (hit.kind === 'path') {
+      if (hit.actor === passDraft.carrier) {
+        setMessage('Click a different skater\'s path, or the ice.')
+        return
+      }
+      const located = locateOnPath(flow, starts, hit.actor, hit.point)
+      if (!located) return
+      target = { kind: 'marker', marker: located.marker }
+    } else if (hit.kind === 'actor') {
+      if (hit.id === passDraft.carrier) return
+      const end = endMarker(flow, starts, hit.id)
+      target = end ? { kind: 'marker', marker: end.marker } : { kind: 'point', at: starts[hit.id], receiver: hit.id }
+    } else {
+      target = { kind: 'point', at: clampToRink(hit.point) }
+    }
+
+    const draft = passDraft
+    stopDrawing()
+    const next = flowEdit((f) => addPass(f, { puck: draft.puck, style, from: draft.from, target }))
+    if (!next) return
+    // Select the pass just made: the one that leaves at the moment that was clicked.
+    const made = buildTimelineModel(next)?.links.findIndex((l) => Math.abs(l.from.t - draft.time) <= 0.02 && l.from.actor === draft.carrier)
+    if (made !== undefined && made >= 0) setSelection({ kind: 'pass', link: made })
+  }
+
   /** A drag of a point on a run in the flow view. A new point is inserted first, then dragged. */
   const stageVertex = (g: VertexGrab, to: Point, phase: StagePhase) => {
     const edit = (f: Flow, s: Starts) => {
@@ -238,6 +325,13 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
           e.preventDefault()
           editor.edit(deleteMove(drill, selection.step, selection.actor))
           setSelection(null)
+        } else if (selection?.kind === 'pass') {
+          e.preventDefault()
+          if (flow && followers(flow, selection.link).length > 0) setMessage('A shot is taken as this pass arrives. Delete that first.')
+          else {
+            flowEdit((f) => removePass(f, selection.link))
+            setSelection(null)
+          }
         } else if (selection?.kind === 'piece') {
           e.preventDefault()
           const kind = flow?.paths[selection.actor]?.[selection.piece]?.kind
@@ -338,7 +432,7 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
               onSelect={(next) => {
                 setSelection(next)
                 setMessage('')
-                if (next?.kind === 'piece') stopDrawing()
+                if (next?.kind === 'piece' || next?.kind === 'pass') stopDrawing()
               }}
               onPlace={(at) => {
                 if (!armed) return
@@ -349,6 +443,9 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
               }}
               onActorDrag={(id, to) => editor.preview(moveActor(drill, id, to))}
               onActorDragEnd={editor.endGesture}
+              passTool={releaseTool}
+              passFrom={passDraft?.point ?? null}
+              onPassClick={onPassClick}
               onRunStart={(actor) => {
                 const who = drill.actors.find((a) => a.id === actor)
                 if (who?.type === 'puck' || who?.carriedBy) setMessage('Runs are for skaters. A puck moves with whoever carries it, or by a pass.')
@@ -484,6 +581,7 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
                 onApply={(issue, choice) => editor.edit(applySuggestion(drill, issue.location, choice))}
               />
             )}
+            {selection?.kind === 'pass' && <PassPanel key={selection.link} drill={drill} link={selection.link} onEdit={(edit) => flowEdit(edit)} />}
             {selection?.kind === 'piece' && (
               <PiecePanel key={`${selection.actor}-${selection.piece}`} drill={drill} actor={selection.actor} piece={selection.piece} onEdit={(edit) => flowEdit(edit)} />
             )}
@@ -503,8 +601,7 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
                 <Palette armed={armed} onArm={setArmed} />
                 <RouteTools
                   armed={routeStyle}
-                  drawing={drawing !== null}
-                  releases={false}
+                  drawing={drawing !== null || passDraft !== null}
                   flow
                   onArm={(s) => {
                     setRouteStyle(s)
