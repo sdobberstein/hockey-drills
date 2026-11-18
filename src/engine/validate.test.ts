@@ -151,6 +151,16 @@ describe('validateDrill', () => {
       expect(validateDrill(fixed)).toEqual([])
     })
 
+    it('rounds suggested numbers to a tenth, so a person is not shown 42.16502433248772', () => {
+      const issue = validateDrill(tooFast()).find((i) => i.code === 'receiver-misses-pass')!
+      const speed = issue.suggestion!.passSpeed!
+      expect(Math.round(speed * 10) / 10).toBe(speed)
+      // ...and the rounded value still fixes the drill.
+      const fixed = tooFast()
+      fixed.steps[1].moves[0].speed = speed
+      expect(validateDrill(fixed)).toEqual([])
+    })
+
     it('does not suggest moving the end of a pass that bends', () => {
       const issue = validateDrill(tooFast()).find((i) => i.code === 'receiver-misses-pass')!
       expect(issue.suggestion?.landAt).toBeUndefined() // the bank has three points

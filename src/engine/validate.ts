@@ -225,11 +225,14 @@ function suggestFix(moves: readonly PlannedMove[], pass: PlannedMove, there: Poi
   if (route) {
     const onRoute = nearestAlongPath(route.path, lands)
     if (onRoute.distance <= RECEIVE_TOLERANCE && onRoute.arc > 0) {
-      suggestion.passSpeed = pathLength(pass.path) / (onRoute.arc / route.speed)
+      // One decimal place: a speed like 42.16502433248772 is noise to a person, and
+      // the difference is far inside the receiving tolerance.
+      suggestion.passSpeed = Math.round((pathLength(pass.path) / (onRoute.arc / route.speed)) * 10) / 10
     }
   }
   if (pass.path.length === 2) {
-    suggestion.landAt = landingSpot(pass.path[0], pass.speed, route?.path, route?.speed ?? 1, there)
+    const spot = landingSpot(pass.path[0], pass.speed, route?.path, route?.speed ?? 1, there)
+    suggestion.landAt = [Math.round(spot[0] * 10) / 10, Math.round(spot[1] * 10) / 10]
   }
   return suggestion
 }
