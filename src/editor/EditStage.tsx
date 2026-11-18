@@ -6,6 +6,7 @@ import { displayPosition } from '../render/layout'
 import { MoveLine } from '../render/MoveLine'
 import { Rink } from '../render/Rink'
 import { viewAspect, viewBoxFor } from '../render/rinkGeometry'
+import { findMove } from './releases'
 import { findRoute } from './routes'
 import type { Drawing, Selection } from './selection'
 
@@ -28,9 +29,12 @@ interface Props {
   onActorDrag: (id: string, to: Point) => void
   onActorDragEnd: () => void
   onRouteStart: (actor: string, from: Point) => void
-  onDrawPoint: (at: Point) => void
+  /** A click while drawing. `onActor` is set if the click landed on an actor. */
+  onDrawPoint: (at: Point, onActor?: string) => void
   onFinishDrawing: () => void
   onVertexDrag: (index: number, to: Point) => void
+  /** The landing handle of a pass aimed at a point is being dragged. */
+  onLandingDrag: (to: Point) => void
   onVertexInsert: (afterIndex: number, at: Point) => void
   onVertexRemove: (index: number) => void
   onVertexDragEnd: () => void
@@ -71,12 +75,19 @@ export function EditStage(props: Props) {
     () => (selection?.kind === 'route' && selection.step === step ? findRoute(drill, selection.step, selection.actor) : undefined),
     [drill, selection, step],
   )
+  // A pass or shot aimed at a point or a teammate has no waypoints, only an end: its landing.
+  const selectedMove = selection?.kind === 'route' && selection.step === step ? findMove(drill, selection.step, selection.actor) : undefined
+  const selectedPath =
+    selectedMove && step !== null ? planSteps[step]?.moves.find((m) => m.actor === selectedMove.actor)?.path : undefined
+  const landing = selectedMove && !selectedMove.points && selectedPath ? selectedPath[selectedPath.length - 1] : undefined
 
   const frame = positions
   const ordered = [...drill.actors].sort((a, b) => Number(a.type === 'puck') - Number(b.type === 'puck'))
   const aspect = viewAspect(drill.rink)
   const busy = drawing !== null || armed !== null || routeTool
 
+  // -1 stands for the landing handle rather than a waypoint.
+  const LANDING = -1
   const startVertexDrag = (e: React.PointerEvent, index: number) => {
     e.stopPropagation()
     svgRef.current!.setPointerCapture(e.pointerId)
@@ -98,7 +109,8 @@ export function EditStage(props: Props) {
         else props.onSelect(null)
       }}
       onPointerMove={(e) => {
-        if (vertexDrag.current !== null) props.onVertexDrag(vertexDrag.current, toFeet(e))
+        if (vertexDrag.current === LANDING) props.onLandingDrag(toFeet(e))
+        else if (vertexDrag.current !== null) props.onVertexDrag(vertexDrag.current, toFeet(e))
         else if (drawing) setCursor(toFeet(e))
       }}
       onPointerUp={() => {
@@ -125,9 +137,9 @@ export function EditStage(props: Props) {
       )}
 
       {/* A halo under the selected route. */}
-      {selectedRoute && (
+      {selectedPath && (
         <polyline
-          points={selectedRoute.points.map(([x, y]) => `${x},${y}`).join(' ')}
+          points={selectedPath.map(([x, y]) => `${x},${y}`).join(' ')}
           fill="none"
           stroke={ACCENT}
           strokeOpacity={0.25}
@@ -139,24 +151,22 @@ export function EditStage(props: Props) {
 
       {/* Invisible wide targets so a thin route line is easy to click. */}
       {step !== null &&
-        drill.steps[step]?.moves.map((move) =>
-          move.points ? (
-            <polyline
-              key={move.actor}
-              points={move.points.map(([x, y]) => `${x},${y}`).join(' ')}
-              fill="none"
-              stroke="transparent"
-              strokeWidth={3.5}
-              strokeLinejoin="round"
-              pointerEvents={busy ? 'none' : 'stroke'}
-              style={{ cursor: 'pointer' }}
-              onPointerDown={(e) => {
-                e.stopPropagation()
-                props.onSelect({ kind: 'route', step, actor: move.actor })
-              }}
-            />
-          ) : null,
-        )}
+        planSteps[step]?.moves.map((move) => (
+          <polyline
+            key={move.actor}
+            points={move.path.map(([x, y]) => `${x},${y}`).join(' ')}
+            fill="none"
+            stroke="transparent"
+            strokeWidth={3.5}
+            strokeLinejoin="round"
+            pointerEvents={busy ? 'none' : 'stroke'}
+            style={{ cursor: 'pointer' }}
+            onPointerDown={(e) => {
+              e.stopPropagation()
+              props.onSelect({ kind: 'route', step, actor: move.actor })
+            }}
+          />
+        ))}
 
       {/* The route being drawn, with a dashed line to where the pointer is. */}
       {drawing && (
@@ -175,6 +185,20 @@ export function EditStage(props: Props) {
             <circle key={i} cx={x} cy={y} r={0.9} fill={ACCENT} stroke="none" />
           ))}
         </g>
+      )}
+
+      {/* The landing handle of a pass or shot aimed at a point or a teammate. */}
+      {landing && (
+        <circle
+          cx={landing[0]}
+          cy={landing[1]}
+          r={1.6}
+          fill={ACCENT}
+          stroke="#fff"
+          strokeWidth={0.4}
+          style={{ cursor: 'grab' }}
+          onPointerDown={(e) => startVertexDrag(e, LANDING)}
+        />
       )}
 
       {/* Handles for the selected route: drag to reshape, drag a "+" to add a point, double-click to remove one. */}
@@ -238,7 +262,7 @@ export function EditStage(props: Props) {
             onPointerDown={(e) => {
               e.stopPropagation()
               if (drawing) {
-                props.onDrawPoint(frame[actor.id] ?? [x, y]) // end a route on an actor
+                props.onDrawPoint(frame[actor.id] ?? [x, y], actor.id) // a click on an actor, e.g. to pass to them
                 return
               }
               if (routeTool) {
@@ -270,8 +294,10 @@ export function EditStage(props: Props) {
               <circle r={GRAB_RADIUS - 0.4} fill="none" stroke={ACCENT} strokeWidth={0.5} strokeDasharray="1.2 0.9" />
             )}
             <ActorSymbol actor={actor} />
-            {/* An invisible, larger target so small things (a puck) are easy to grab. */}
-            <circle r={GRAB_RADIUS} fill="transparent" />
+            {/* An invisible, larger target so small things (a puck) are easy to grab. A
+                carried puck sits beside its carrier, so its target must stay small or it
+                would cover the carrier and you could not click the player holding it. */}
+            <circle r={carried ? 1.4 : GRAB_RADIUS} fill="transparent" />
           </g>
         )
       })}

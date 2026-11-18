@@ -13,7 +13,8 @@ import { DetailsPanel } from './DetailsPanel'
 import { EditStage } from './EditStage'
 import { addActor, deleteActor, moveActor } from './ops'
 import { clampToRink } from './rink'
-import { addRoute, deleteRoute, findRoute, insertPoint, movePoint, removePoint, setRoutePoints } from './routes'
+import { addRelease, applySuggestion, deleteMove, findMove, RELEASE_STYLES, retimePass, setLanding } from './releases'
+import { addRoute, findRoute, insertPoint, movePoint, removePoint, setRoutePoints } from './routes'
 import { RoutePanel } from './RoutePanel'
 import { RouteTools } from './RouteTools'
 import { finishDrawing, type Drawing, type Selection } from './selection'
@@ -66,6 +67,9 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
 
   const selectedActor = selection?.kind === 'actor' ? (drill.actors.find((a) => a.id === selection.id) ?? null) : null
   const selectedRoute = selection?.kind === 'route' ? findRoute(drill, selection.step, selection.actor) : undefined
+  const selectedMove = selection?.kind === 'route' ? findMove(drill, selection.step, selection.actor) : undefined
+  // A pass, shot or drop pass is a move of the puck; everything else is a route.
+  const releaseTool = routeStyle !== null && RELEASE_STYLES.includes(routeStyle)
   const result = useMemo(() => parseDrill(drill), [drill])
   const valid = result.drill !== null
 
@@ -81,18 +85,36 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
     setArmed(null)
   }
 
-  const finish = () => {
+  /** Add the move being drawn, then select it. `receiver` is set when a pass ended on a teammate. */
+  const commitDrawing = (points: readonly Point[], receiver?: string) => {
     if (!drawing || step === null || routeStyle === null) return
-    const points = finishDrawing(drawing)
     stopDrawing()
-    if (!points) return
-    const next = addRoute(drill, step, drawing.actor, routeStyle, points)
+    let next = drill
+    if (releaseTool) {
+      if (receiver !== undefined && points.length === 2) {
+        // Aimed at a teammate: if they are skating, move the landing spot onto their route.
+        next = retimePass(addRelease(drill, step, drawing.actor, routeStyle, { kind: 'actor', id: receiver }), step, drawing.actor)
+      } else if (points.length === 2) {
+        next = addRelease(drill, step, drawing.actor, routeStyle, { kind: 'point', at: points[1] })
+      } else {
+        next = addRelease(drill, step, drawing.actor, routeStyle, { kind: 'path', points }, receiver)
+      }
+    } else {
+      next = addRoute(drill, step, drawing.actor, routeStyle, points)
+    }
     if (next === drill) {
-      setMessage(`Could not add that route for ${drawing.actor}.`)
+      setMessage(`Could not add that for ${drawing.actor}.`)
       return
     }
     editor.edit(next)
     setSelection({ kind: 'route', step, actor: drawing.actor })
+  }
+
+  const finish = () => {
+    if (!drawing) return
+    const points = finishDrawing(drawing)
+    if (points) commitDrawing(points)
+    else stopDrawing()
   }
 
   // Keyboard: undo/redo, finish/cancel, delete, nudge. Ignored while typing in a field.
@@ -121,7 +143,7 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
           setSelection(null)
         } else if (selection?.kind === 'route') {
           e.preventDefault()
-          editor.edit(deleteRoute(drill, selection.step, selection.actor))
+          editor.edit(deleteMove(drill, selection.step, selection.actor))
           setSelection(null)
         }
       } else if (selectedActor && step === null && e.key.startsWith('Arrow')) {
@@ -222,6 +244,19 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
             onRouteStart={(actor, from) => {
               if (step === null) return
               const who = drill.actors.find((a) => a.id === actor)
+              if (releaseTool) {
+                // Clicking the puck, or the player carrying it, starts a release.
+                const carried = plan?.steps[step]?.before.carriers
+                const puck = who?.type === 'puck' ? who.id : [...(carried ?? [])].find(([, carrier]) => carrier === actor)?.[0]
+                if (!puck || !carried?.has(puck)) setMessage('Click the player who has the puck.')
+                else if (drill.steps[step].moves.some((m) => m.actor === puck)) setMessage('The puck already moves in this step. Select its pass to edit it.')
+                else {
+                  setMessage('')
+                  setSelection(null)
+                  setDrawing({ actor: puck, points: [positions[puck] ?? from] })
+                }
+                return
+              }
               if (who?.carriedBy) setMessage(`${actor} is carried; it moves with ${who.carriedBy}. Draw a route for ${who.carriedBy}.`)
               else if (drill.steps[step].moves.some((m) => m.actor === actor)) setMessage(`${actor} already has a move in this step. Select its route to edit it.`)
               else {
@@ -230,11 +265,22 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
                 setDrawing({ actor, points: [from] })
               }
             }}
-            onDrawPoint={(at) => setDrawing((d) => (d ? { ...d, points: [...d.points, clampToRink(at)] } : d))}
+            onDrawPoint={(at, onActor) => {
+              if (!drawing) return
+              // A pass ends the moment you click a teammate: that is who it is for.
+              if (releaseTool && onActor && onActor !== drawing.actor && !drill.actors.find((a) => a.id === onActor)?.carriedBy) {
+                commitDrawing([...drawing.points, clampToRink(at)], onActor)
+                return
+              }
+              setDrawing({ ...drawing, points: [...drawing.points, clampToRink(at)] })
+            }}
             onFinishDrawing={finish}
             onVertexDrag={(index, to) => reshape((pts) => movePoint(pts, index, clampToRink(to)), true)}
             onVertexInsert={(after, at) => reshape((pts) => insertPoint(pts, after, clampToRink(at)), true)}
             onVertexRemove={(index) => reshape((pts) => removePoint(pts, index), false)}
+            onLandingDrag={(to) => {
+              if (selection?.kind === 'route') editor.preview(setLanding(drill, selection.step, selection.actor, clampToRink(to)))
+            }}
             onVertexDragEnd={editor.endGesture}
           />
           <aside className="panels">
@@ -245,7 +291,7 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
               <RouteTools armed={routeStyle} drawing={drawing !== null} onArm={(s) => { setRouteStyle(s); setDrawing(null); setMessage('') }} />
             )}
             {selectedActor && <ActorPanel key={selectedActor.id} drill={drill} actor={selectedActor} onEdit={editor.edit} />}
-            {selection?.kind === 'route' && selectedRoute && (
+            {selection?.kind === 'route' && selectedMove && (
               <RoutePanel
                 key={`${selection.step}-${selection.actor}`}
                 drill={drill}
@@ -257,7 +303,13 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
               />
             )}
             <DetailsPanel drill={drill} onEdit={editor.edit} />
-            {result.issues.length > 0 && <Issues title="To finish this drill" issues={result.issues} />}
+            {result.issues.length > 0 && (
+              <Issues
+                title="To finish this drill"
+                issues={result.issues}
+                onApply={(issue, choice) => editor.edit(applySuggestion(drill, issue.location, choice))}
+              />
+            )}
           </aside>
         </div>
       )}
