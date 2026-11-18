@@ -167,7 +167,13 @@ export function buildTimelineModel(drill: Drill): TimelineModel | null {
       carrier = f.receiver ?? null
       clock = f.t1
     }
-    if (plan.duration > clock) spans.push({ t0: clock, t1: plan.duration, carrier })
+    // A puck always has at least one span, even in a drill with no moves yet (duration 0), so
+    // "who has it" has an answer before anything has happened: that is when you link the first pass.
+    // It also has one if the drill ends the instant a pass lands: that skater has the puck, if only at
+    // the end, and must be able to pass it on.
+    if (plan.duration > clock || spans.length === 0 || carrier !== null) {
+      spans.push({ t0: clock, t1: Math.max(plan.duration, clock), carrier })
+    }
     pucks.push({ actor: actor.id, label: actor.label ?? actor.id, spans })
   }
 
@@ -233,4 +239,20 @@ export function whyNoPuck(drill: Drill, model: TimelineModel, actor: string, tim
   if (neverCarried) return `The puck is not being carried by anyone. Select it and set “Carried by” to ${actor}.`
 
   return `Nobody has the puck at ${at}: it is loose after a pass or shot that nobody received.`
+}
+
+/**
+ * The first moment a skater has a puck, and which puck: from the start if they begin with
+ * it, or the instant a pass reaches them. This is what "click the skater" means when
+ * linking a pass, so a skater who has no path (a coach feeding pucks, or F1 passing before
+ * anyone has moved) can still be the passer. Null if they never have one.
+ */
+export function firstPossession(model: TimelineModel, actor: string): { puck: string; time: number } | null {
+  let best: { puck: string; time: number } | null = null
+  for (const row of model.pucks) {
+    for (const span of row.spans) {
+      if (span.carrier === actor && (!best || span.t0 < best.time)) best = { puck: row.actor, time: span.t0 }
+    }
+  }
+  return best
 }

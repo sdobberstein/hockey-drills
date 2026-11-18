@@ -73,7 +73,7 @@ export function RouteTools({ armed, drawing, onArm, releases = true, flow = fals
               ? drawing
                 ? 'Green marks where on the other paths it can land. Click in the green, or near it. Click elsewhere on the ice for a loose pass. Esc cancels.'
                 : armed
-                  ? 'Click the passer\'s path at the point where the pass leaves.'
+                  ? 'Click the passer\'s path where the pass leaves, or click the passer to pass from where they first have the puck.'
                   : 'Pick a style, then click a path.'
               : drawing
                 ? releasing

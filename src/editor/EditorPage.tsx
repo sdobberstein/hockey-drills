@@ -12,9 +12,9 @@ import { drillToFlow } from '../flow/import'
 import { appendRun, pathEnd, removeRun, setRunPoints } from '../flow/pathEdit'
 import { addPass, believable, endMarker, explain, followers, landingZones, locateOnPath, removePass, snapToLanding } from '../flow/passEdit'
 import { pointAlong } from '../engine/geometry'
-import { buildTimelineModel, mergedFlights, NO_PUCK_MESSAGE, puckCarriedBy, whyNoPuck } from '../flow/view'
+import { buildTimelineModel, firstPossession, mergedFlights, NO_PUCK_MESSAGE, puckCarriedBy, whyNoPuck } from '../flow/view'
 import type { After, EventTarget, Marker } from '../flow/types'
-import { segmentsFor } from '../flow/timeline'
+import { markerAtTime, markerPoint, segmentsFor } from '../flow/timeline'
 import type { Flow } from '../flow/types'
 import { Timeline, type DragPhase } from '../flow/TimelineView'
 import { libraryDrills } from '../library/drills'
@@ -227,7 +227,7 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
 
     if (!passDraft) {
       if (hit.kind === 'ice') {
-        setMessage('Click on a skater\'s path where the pass should leave.')
+        setMessage('Click on a skater\'s path where the pass should leave, or click the skater to pass from where they first have the puck.')
         return
       }
       const actor = hit.kind === 'path' ? hit.actor : hit.id
@@ -241,14 +241,26 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
         time = located.time
         point = hit.point
       } else {
-        // Clicking the skater themselves means from where they start.
-        if (!flow.paths[actor]?.length) {
-          setMessage(`${actor} has no path yet. Draw a run for them, then click it where the pass should leave.`)
+        // Clicking the skater themselves means the first moment they have the puck: the start, if
+        // they begin with it, or the instant a pass reaches them. It works for a skater with no
+        // path at all, such as a coach who feeds pucks or F1 passing before anyone has moved.
+        const first = firstPossession(model, actor)
+        if (!first) {
+          setMessage(whyNoPuck(drill, model, actor, 0))
           return
         }
-        marker = { actor, piece: 0, at: 0 }
-        time = 0
-        point = starts[actor]
+        time = first.time
+        const pieces = flow.paths[actor] ?? []
+        if (pieces.length > 0) {
+          const segs = segmentsFor(pieces, starts[actor])
+          marker = markerAtTime(segs, actor, time) ?? { actor, piece: 0, at: 0 }
+          point = markerPoint(segs, marker, starts[actor])
+        } else {
+          // No path: they stand at their start. A marker on a path that is not there reads as "at the
+          // start", and a pass arriving later is picked up by the chain below instead.
+          marker = { actor, piece: 0, at: 0 }
+          point = starts[actor]
+        }
       }
 
       const puck = puckCarriedBy(model, actor, time)
@@ -302,7 +314,8 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
       target = landOn(hit.actor, located.marker, located.time, hit.point)
     } else if (hit.kind === 'actor') {
       if (hit.id === passDraft.carrier) return
-      const end = endMarker(flow, starts, hit.id)
+      // A skater with no runs just stands there (a wait piece left by an earlier pass is not a path to land on).
+      const end = flow.paths[hit.id]?.some((p) => p.kind === 'run') ? endMarker(flow, starts, hit.id) : null
       target = end ? landOn(hit.id, end.marker, end.time, starts[hit.id]) : { kind: 'point', at: starts[hit.id], receiver: hit.id }
     } else {
       // On the ice: near a green stretch means "that area"; anywhere else is a loose pass.

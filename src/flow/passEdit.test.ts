@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { stopAndWait, twoOnOne } from '../engine/fixtures'
+import { buildTimeline } from '../engine/timeline'
 import type { Drill } from '../engine/types'
 import { validateDrill } from '../engine/validate'
 import { editViaFlow } from './apply'
 import { compileFlow } from './compile'
 import type { Starts } from './edit'
 import { drillToFlow } from './import'
+import { appendRun } from './pathEdit'
 import { addPass, believable, endMarker, explain, followers, landingZones, locateOnPath, removePass, setPassSpeed, setPassStyle, snapToLanding } from './passEdit'
 import { segmentsFor } from './timeline'
-import { buildTimelineModel, carrierAtTime, puckCarriedBy } from './view'
+import { buildTimelineModel, carrierAtTime, firstPossession, puckCarriedBy } from './view'
 import type { Flow } from './types'
 import { pointAlong } from '../engine/geometry'
 
@@ -331,5 +333,95 @@ describe('explain', () => {
     expect(explain({ ok: false, reason: 'too-fast', speed: 140, seconds: 0.3 }, 'F2', 'F1')).toContain('140 ft/s')
     expect(explain({ ok: false, reason: 'too-fast', speed: 140, seconds: 0.3 }, 'F2', 'F1')).toContain('further along')
     expect(explain({ ok: false, reason: 'too-slow', speed: 9, seconds: 4 }, 'F2', 'F1')).toContain('earlier')
+  })
+})
+
+describe('passing from a skater who has no path', () => {
+  /** F1 starts with the puck and nobody has a path: a coach is standing by to take the first pass. */
+  const empty = (): Drill => ({
+    version: 1,
+    id: 'feed',
+    title: 'Feed',
+    rink: 'full',
+    actors: [
+      { id: 'F1', type: 'forward', start: [50, 40] },
+      { id: 'C1', type: 'coach', start: [20, 40] },
+      { id: 'puck', type: 'puck', start: [50, 40], carriedBy: 'F1' },
+    ],
+    steps: [],
+  })
+
+  it('knows who has the puck in a drill where nothing has happened yet (it has no length)', () => {
+    const model = buildTimelineModel(empty())!
+    expect(model.duration).toBe(0)
+    expect(carrierAtTime(model, 'puck', 0)).toBe('F1')
+    expect(puckCarriedBy(model, 'F1', 0)).toBe('puck')
+    expect(firstPossession(model, 'F1')).toEqual({ puck: 'puck', time: 0 })
+  })
+
+  it('counts a skater who has the puck at the very end, when the drill stops as a pass lands', () => {
+    const d = editViaFlow(empty(), (f) =>
+      addPass(f, { puck: 'puck', style: 'pass', from: { actor: 'F1', piece: 0, at: 0 }, target: { kind: 'point', at: [20, 40], receiver: 'C1' } }),
+    )!.drill
+    const model = buildTimelineModel(d)!
+    const first = firstPossession(model, 'C1')!
+    expect(first.puck).toBe('puck')
+    expect(first.time).toBeCloseTo(model.duration) // from the instant it arrives
+    expect(carrierAtTime(model, 'puck', model.duration)).toBe('C1')
+  })
+
+  it('knows when a skater first has a puck: at the start for the one who begins with it', () => {
+    const d = compileFlow(empty(), { paths: { F1: [{ kind: 'run', style: 'skate', points: [[50, 40], [90, 40]] }] }, events: [] }).drill
+    expect(firstPossession(buildTimelineModel(d)!, 'F1')).toEqual({ puck: 'puck', time: 0 })
+  })
+
+  it('and the instant a pass reaches them, for one who receives it later', () => {
+    const d = editViaFlow(empty(), (f) =>
+      addPass(f, { puck: 'puck', style: 'pass', from: { actor: 'F1', piece: 0, at: 0 }, target: { kind: 'point', at: [20, 40], receiver: 'C1' } }),
+    )!.drill
+    // The pass arrives, then F1 skates on and the coach holds the puck (nobody moves for the coach).
+    const model = buildTimelineModel(d)!
+    const coach = firstPossession(model, 'C1')
+    expect(coach === null || coach.time > 0).toBe(true)
+  })
+
+  it('is null for a skater who never has one', () => {
+    expect(firstPossession(buildTimelineModel(empty())!, 'C1')).toBeNull()
+  })
+
+  it('lets F1 pass to the coach at the very start, with neither having a path', () => {
+    const result = editViaFlow(empty(), (f) =>
+      addPass(f, { puck: 'puck', style: 'pass', from: { actor: 'F1', piece: 0, at: 0 }, target: { kind: 'point', at: [20, 40], receiver: 'C1' } }),
+    )!
+    expect(result.added).toEqual([])
+    expect(validateDrill(result.drill)).toEqual([])
+    const pass = result.drill.steps.flatMap((s) => s.moves).find((m) => m.style === 'pass')!
+    expect(pass.receiver).toBe('C1')
+    expect(pass.to).toEqual([20, 40])
+    expect(buildTimeline(result.drill).at(0).puck).toEqual([50, 40]) // starts with F1
+  })
+
+  it('then lets the coach pass it back as it arrives', () => {
+    const first = editViaFlow(empty(), (f) =>
+      addPass(f, { puck: 'puck', style: 'pass', from: { actor: 'F1', piece: 0, at: 0 }, target: { kind: 'point', at: [20, 40], receiver: 'C1' } }),
+    )!.drill
+    const back = editViaFlow(first, (f) =>
+      addPass(f, { puck: 'puck', style: 'pass', from: { after: 0 }, target: { kind: 'point', at: [50, 40], receiver: 'F1' } }),
+    )!
+    expect(back.added).toEqual([])
+    expect(validateDrill(back.drill)).toEqual([])
+    const passes = back.drill.steps.flatMap((s) => s.moves).filter((m) => m.style === 'pass')
+    expect(passes.map((m) => m.receiver)).toEqual(['C1', 'F1'])
+    const end = buildTimeline(back.drill)
+    expect(Math.hypot(end.at(end.duration).puck[0] - 50, end.at(end.duration).puck[1] - 40)).toBeLessThan(1) // back with F1
+  })
+
+  it('and F1 can start moving afterwards without disturbing the pass', () => {
+    const first = editViaFlow(empty(), (f) =>
+      addPass(f, { puck: 'puck', style: 'pass', from: { actor: 'F1', piece: 0, at: 0 }, target: { kind: 'point', at: [20, 40], receiver: 'C1' } }),
+    )!.drill
+    const moved = editViaFlow(first, (f, s) => appendRun(f, s, 'F1', 'skate', [[50, 40], [110, 60]]))!
+    expect(moved.added).toEqual([])
+    expect(validateDrill(moved.drill)).toEqual([])
   })
 })
