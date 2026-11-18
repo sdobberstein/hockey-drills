@@ -69,6 +69,15 @@ interface MoveBase {
    * follows a path, such as a bank off the boards.
    */
   receiver?: string
+  /**
+   * This move carries on a pass or shot that began in an earlier step: the puck
+   * is already in the air, and this is the next stretch of the same flight.
+   * A step holds all the moves in it, so a flight that lasts longer than one
+   * step (because a skater changes style, say, which starts a new step) is
+   * written as a chain: the release, then one of these in each following step.
+   * `receiver` goes on the last stretch only.
+   */
+  continues?: boolean
 }
 export interface PathMove extends MoveBase {
   points: Point[]

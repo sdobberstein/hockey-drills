@@ -37,8 +37,10 @@ export interface PlannedMove {
   speed: number
   /** Seconds. */
   duration: number
-  /** True if this move lets go of a carried puck. */
+  /** True if this move lets go of a carried puck (or, for a continuation, is part of a pass or shot in the air). */
   releases: boolean
+  /** The puck was already in the air; this is a later stretch of the same flight. */
+  continues?: boolean
   /** Actor that picks the puck up on arrival. */
   receiver?: string
 }
@@ -107,6 +109,7 @@ export function planDrill(drill: Drill): Plan {
         // A pass aimed at an actor hands over to that actor; a banked or
         // lead pass names its receiver explicitly.
         receiver: releases ? (move.receiver ?? (typeof move.to === 'string' ? move.to : undefined)) : undefined,
+        ...(move.continues ? { continues: true } : {}),
       }
     })
 

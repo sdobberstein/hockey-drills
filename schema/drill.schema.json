@@ -90,6 +90,10 @@
         "receiver": {
           "type": "string",
           "description": "Actor that picks the puck up when a release ends. Implied when `to` is an actor id."
+        },
+        "continues": {
+          "type": "boolean",
+          "description": "Carries on a pass or shot already in the air from an earlier step. The puck is loose when this step begins; `receiver` goes on the last stretch only."
         }
       },
       "oneOf": [

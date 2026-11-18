@@ -47,6 +47,7 @@ export type IssueCode =
   | 'path-start-mismatch'
   | 'release-style-needs-puck'
   | 'release-without-carrier'
+  | 'continues-while-carried'
   | 'carried-actor-moves'
   | 'receiver-misses-pass'
 
@@ -163,6 +164,15 @@ function checkState(drill: Drill): Issue[] {
             message: `"${move.style}" is a puck movement; it must be a move of the puck, not "${move.actor}".`,
             location,
           })
+        } else if (move.continues) {
+          // A flight carrying on from an earlier step: the puck must already be in the air.
+          if (carrier) {
+            issues.push({
+              code: 'continues-while-carried',
+              message: `"${move.actor}" is marked as a flight carrying on, but ${carrier} is carrying it at this point.`,
+              location,
+            })
+          }
         } else if (!carrier) {
           issues.push({
             code: 'release-without-carrier',

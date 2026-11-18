@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { clone, cycleGiveAndGo, twoOnOne } from './fixtures'
 import type { Drill } from './types'
+import { buildTimeline } from './timeline'
+import { parseDrill } from './parse'
 import { validateDrill, type IssueCode } from './validate'
 
 const codes = (drill: Drill): IssueCode[] => validateDrill(drill).map((i) => i.code)
@@ -173,5 +175,68 @@ describe('validateDrill', () => {
       expect(issue.suggestion?.landAt).toBeDefined()
       expect(issue.suggestion?.passSpeed).toBeUndefined()
     })
+  })
+})
+
+describe('a flight that lasts longer than one step', () => {
+  /** F1 skates on for two steps while a shot, released at the start, is still in the air in the second. */
+  const split = (): Drill => ({
+    version: 1,
+    id: 'split-shot',
+    title: 'Split shot',
+    rink: 'full',
+    actors: [
+      { id: 'F1', type: 'forward', start: [30, 20] },
+      { id: 'puck', type: 'puck', start: [30, 20], carriedBy: 'F1' },
+    ],
+    steps: [
+      {
+        moves: [
+          { actor: 'F1', style: 'skate', speed: 20, points: [[30, 20], [50, 20]] },
+          { actor: 'puck', style: 'shoot', speed: 100, to: [130, 20] },
+        ],
+      },
+      {
+        moves: [
+          { actor: 'F1', style: 'backward', speed: 20, points: [[50, 20], [60, 20]] },
+          { actor: 'puck', style: 'shoot', speed: 100, to: [190, 42], continues: true },
+        ],
+      },
+    ],
+  })
+
+  it('is valid when the later stretches are marked as carrying on', () => {
+    expect(validateDrill(split())).toEqual([])
+  })
+
+  it('moves the puck on from where the last stretch left it', () => {
+    const tl = buildTimeline(split())
+    expect(tl.at(1).puck[0]).toBeCloseTo(130) // end of the first stretch: 100 ft at 100 ft/s, then the step ends at 1 s
+    const end = tl.at(tl.duration).puck
+    expect(end[0]).toBeCloseTo(190)
+    expect(end[1]).toBeCloseTo(42)
+  })
+
+  it('does not jump across the step boundary', () => {
+    const tl = buildTimeline(split())
+    const before = tl.at(1 - 1e-4).puck
+    const after = tl.at(1 + 1e-4).puck
+    expect(Math.hypot(after[0] - before[0], after[1] - before[1])).toBeLessThan(0.1)
+  })
+
+  it('is rejected without the marker, since the puck is not carried at that point', () => {
+    const d = split()
+    delete (d.steps[1].moves[1] as { continues?: boolean }).continues
+    expect(codes(d)).toContain('release-without-carrier')
+  })
+
+  it('is rejected if the puck is still being carried when it is marked as carrying on', () => {
+    const d = split()
+    d.steps[0].moves = d.steps[0].moves.filter((m) => m.actor === 'F1') // F1 never let go of the puck
+    expect(codes(d)).toContain('continues-while-carried')
+  })
+
+  it('is valid under the JSON Schema too', () => {
+    expect(parseDrill(split()).issues).toEqual([])
   })
 })
