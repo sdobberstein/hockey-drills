@@ -59,6 +59,14 @@ describe('import then compile behaves like the original', () => {
     sameBehaviour(stopAndWait, rebuilt)
   })
 
+  it('keeps every step name and note, in the same order', () => {
+    for (const [, drill] of library) {
+      const { drill: rebuilt } = roundTrip(drill)
+      expect(rebuilt.steps.map((s) => s.name)).toEqual(drill.steps.map((s) => s.name))
+      expect(rebuilt.steps.map((s) => s.notes)).toEqual(drill.steps.map((s) => s.notes))
+    }
+  })
+
   it('produces a drill that passes full validation, schema included', () => {
     for (const drill of [cycleGiveAndGo, stopAndWait, twoOnOne]) {
       expect(parseDrill(roundTrip(drill).drill).issues).toEqual([])

@@ -124,6 +124,10 @@ export function compileFlow(drill: Drill, flow: Flow): Compiled {
     marks.push({ t: r.tRel, starts: true })
     end = Math.max(end, r.tLand)
   }
+  // A phase starts a step of its own, so that the name has a step to go on.
+  for (const phase of flow.phases ?? []) {
+    if (phase.start >= 0 && phase.start < end) marks.push({ t: phase.start, starts: true })
+  }
   marks.push({ t: end, starts: false })
 
   const merged = [...marks]
@@ -204,12 +208,18 @@ export function compileFlow(drill: Drill, flow: Flow): Compiled {
       moves.push(emitRelease(r))
       name ??= r.event.name
     }
+    // A phase that starts here names the step (and wins over an event's own name).
+    const phase = (flow.phases ?? []).find((p) => Math.abs(p.start - a) <= MERGE)
+    if (phase?.name) name = phase.name
 
     if (moves.length === 0) {
       problems.push({ code: 'nobody-moves', time: a, message: `Nobody moves from ${a.toFixed(2)} s to ${c.toFixed(2)} s, so there is no step for it; that time is removed.` })
       continue
     }
-    steps.push(name ? { name, moves } : { moves })
+    const step: Step = { moves }
+    if (name) step.name = name
+    if (phase?.notes) step.notes = phase.notes
+    steps.push(step)
   }
 
   const result: Drill = { ...drill, steps }

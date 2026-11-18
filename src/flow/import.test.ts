@@ -2,6 +2,21 @@ import { describe, expect, it } from 'vitest'
 import { clone, stopAndWait, twoOnOne } from '../engine/fixtures'
 import { drillToFlow } from './import'
 
+describe('step names become phases', () => {
+  it('keeps each name and note, and when its step started', () => {
+    const d = clone(twoOnOne)
+    d.steps[0].notes = 'F1 carries, F2 stays wide.'
+    const flow = drillToFlow(d)!
+    expect(flow.phases!.map((p) => p.name)).toEqual(['Attack', 'Pass', 'Walk in', 'Shot'])
+    expect(flow.phases![0]).toEqual({ start: 0, name: 'Attack', notes: 'F1 carries, F2 stays wide.' })
+    expect(flow.phases![1].start).toBeCloseTo(2.4, 1) // when "Pass" began (F2's 60 ft at 25 ft/s)
+  })
+
+  it('has no phases for a drill whose steps are unnamed', () => {
+    expect(drillToFlow(stopAndWait)!.phases).toBeUndefined()
+  })
+})
+
 describe('importing a drill that stops and starts', () => {
   const flow = drillToFlow(stopAndWait)!
 

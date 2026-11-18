@@ -55,8 +55,27 @@ export interface PuckEvent {
   name?: string
 }
 
+/**
+ * A named stretch of the drill, such as "Cross on the boards". It marks where
+ * the stretch begins; it lasts until the next one. These carry the step names
+ * and notes a coach wrote, so they survive turning a drill into a flow and
+ * back. They are labels: a phase starts a new step, but changes nothing about
+ * how anyone moves.
+ *
+ * The start is in seconds for now. When flows become editable, phases will
+ * need to be anchored to something that moves with the edit.
+ */
+export interface Phase {
+  /** Seconds from the start of the drill. */
+  start: number
+  name?: string
+  notes?: string
+}
+
 export interface Flow {
   /** Each actor's path. An actor with no entry stands still for the whole drill. */
   paths: Record<string, Piece[]>
   events: PuckEvent[]
+  /** Named stretches, in order of start. */
+  phases?: Phase[]
 }

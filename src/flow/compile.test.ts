@@ -91,6 +91,41 @@ describe('compiling a flow built by hand', () => {
   })
 })
 
+describe('phases name the steps', () => {
+  const flow = (): Flow => ({
+    paths: {
+      F1: [{ kind: 'run', style: 'skate-puck', points: [[50, 20], [120, 20]] }],
+      F2: [{ kind: 'run', style: 'skate', speed: 22.5, points: [[50, 60], [120, 45]] }],
+    },
+    events: [],
+    phases: [
+      { start: 0, name: 'Go', notes: 'Both skate.' },
+      { start: 1.5, name: 'Halfway' },
+    ],
+  })
+
+  it('starts a step at each phase and names it', () => {
+    const { drill, problems } = compileFlow(base(), flow())
+    expect(problems).toEqual([])
+    expect(drill.steps.map((s) => s.name)).toEqual(['Go', 'Halfway'])
+    expect(drill.steps[0].notes).toBe('Both skate.')
+  })
+
+  it('does not change how anyone moves, only where the steps fall', () => {
+    const withPhases = buildTimeline(compileFlow(base(), flow()).drill)
+    const without = buildTimeline(compileFlow(base(), { ...flow(), phases: undefined }).drill)
+    for (let t = 0; t <= withPhases.duration; t += 0.1) {
+      expect(withPhases.at(t).F2[0]).toBeCloseTo(without.at(t).F2[0], 1)
+    }
+  })
+
+  it('ignores a phase that starts after the drill is over', () => {
+    const f = flow()
+    f.phases!.push({ start: 99, name: 'Never' })
+    expect(compileFlow(base(), f).drill.steps.map((s) => s.name)).not.toContain('Never')
+  })
+})
+
 describe('problems are reported, not hidden', () => {
   const flow = (): Flow => ({
     paths: {

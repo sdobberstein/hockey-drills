@@ -2,7 +2,7 @@ import { distance } from '../engine/geometry'
 import { planDrill } from '../engine/plan'
 import type { Drill, Point } from '../engine/types'
 import { endTime, markerAtTime, segmentsFor, TIME_EPS } from './timeline'
-import type { EventTarget, Flow, Marker, Piece, PuckEvent, RunPiece } from './types'
+import type { EventTarget, Flow, Marker, Phase, Piece, PuckEvent, RunPiece } from './types'
 
 const copy = (p: Point): Point => [p[0], p[1]]
 
@@ -84,12 +84,17 @@ export function drillToFlow(drill: Drill): Flow | null {
       }
       const event: PuckEvent = { puck: planned.actor, style: planned.style, from, target }
       if (raw.speed !== undefined && target.kind === 'point') event.speed = raw.speed
-      const name = drill.steps[si].name
-      if (name) event.name = name
       events.push(event)
     })
   })
-  return broken ? null : { paths, events }
+  // 4. The names and notes a coach gave the steps, kept as phases.
+  const phases: Phase[] = []
+  plan.steps.forEach((step, si) => {
+    const { name, notes } = drill.steps[si]
+    if (name || notes) phases.push({ start: step.start, ...(name ? { name } : {}), ...(notes ? { notes } : {}) })
+  })
+
+  return broken ? null : { paths, events, ...(phases.length > 0 ? { phases } : {}) }
 }
 
 /** Standing still: extend a wait that is already last, so two waits never sit side by side. */
