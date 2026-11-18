@@ -22,11 +22,23 @@ export async function encode(value: unknown): Promise<string> {
   return toBase64Url(await pipe(bytes, new CompressionStream('deflate-raw')))
 }
 
-/** Throws if the text is not valid base64url, not deflate data, too big, or not JSON. */
+const TOO_LARGE = 'The drill data in this link is too large.'
+const DAMAGED = 'This link is damaged or incomplete.'
+
+/**
+ * Throws an Error with a message fit to show a person if the text is not valid
+ * base64url, not deflate data, too big, or not JSON. The browser's own errors
+ * ("Failed to execute 'atob'...") mean nothing to someone who just clicked a
+ * link, so every failure is turned into one of two plain messages.
+ */
 export async function decode(text: string): Promise<unknown> {
-  const compressed = fromBase64Url(text)
-  const bytes = await pipe(compressed, new DecompressionStream('deflate-raw'), MAX_DRILL_BYTES)
-  return JSON.parse(new TextDecoder().decode(bytes))
+  try {
+    const compressed = fromBase64Url(text)
+    const bytes = await pipe(compressed, new DecompressionStream('deflate-raw'), MAX_DRILL_BYTES)
+    return JSON.parse(new TextDecoder().decode(bytes))
+  } catch (error) {
+    throw new Error(error instanceof Error && error.message === TOO_LARGE ? TOO_LARGE : DAMAGED)
+  }
 }
 
 /** Run bytes through a transform stream, optionally refusing to read past `limit` bytes out. */
@@ -47,7 +59,7 @@ async function pipe(
       size += value.length
       if (size > limit) {
         await reader.cancel()
-        throw new Error('The drill data is too large.')
+        throw new Error(TOO_LARGE)
       }
       chunks.push(value)
     }
@@ -75,7 +87,7 @@ function toBase64Url(bytes: Uint8Array): string {
 }
 
 function fromBase64Url(text: string): Uint8Array {
-  if (!/^[A-Za-z0-9_-]*$/.test(text)) throw new Error('The link is not valid.')
+  if (!/^[A-Za-z0-9_-]*$/.test(text)) throw new Error(DAMAGED)
   const padded = text.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(text.length / 4) * 4, '=')
   return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0))
 }

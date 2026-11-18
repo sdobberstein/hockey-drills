@@ -23,8 +23,13 @@ describe('share codec', () => {
     expect((await decode(await encode(d)) as typeof d).title).toBe(d.title)
   })
 
-  it('rejects text that is not base64url', async () => {
-    await expect(decode('not valid!!')).rejects.toThrow()
+  it('rejects text that is not base64url, with a message fit for a person', async () => {
+    await expect(decode('not valid!!')).rejects.toThrow('damaged or incomplete')
+  })
+
+  it('never leaks the browser\'s internal error text', async () => {
+    // 5 characters is not a valid base64 length; atob would say "not correctly encoded".
+    await expect(decode('abcde')).rejects.toThrow('damaged or incomplete')
   })
 
   it('rejects data that is not compressed', async () => {
