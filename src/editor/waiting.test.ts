@@ -1,46 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { cycleGiveAndGo, clone } from '../engine/fixtures'
+import { cycleGiveAndGo, clone, stopAndWait as reported } from '../engine/fixtures'
 import { buildTimeline } from '../engine/timeline'
 import type { Drill } from '../engine/types'
 import { validateDrill } from '../engine/validate'
 import { findMove } from './releases'
 import { findRoute } from './routes'
 import { applyPassSpeedFix, continueSkating, extendRoute, findWaits, passSpeedFix } from './waiting'
-
-/**
- * A drill from a real editing session, kept as a regression case: F2 skates,
- * stops dead for a third of a second waiting for the pass, and the shot is
- * taken with both forwards standing still. (The pass speed is the unrounded
- * number the editor used to suggest.)
- */
-const reported: Drill = {
-  version: 1,
-  id: 'reported',
-  title: 'Reported drill',
-  rink: 'half-left',
-  actors: [
-    { id: 'F1', type: 'forward', start: [96.2, 80.9] },
-    { id: 'F2', type: 'forward', start: [96.2, 60.4] },
-    { id: 'pylon', type: 'pylon', start: [58.2, 75.4] },
-    { id: 'puck', type: 'puck', start: [96.2, 80.9], carriedBy: 'F1' },
-  ],
-  steps: [
-    {
-      moves: [
-        { actor: 'F1', style: 'skate-puck', points: [[96.2, 80.9], [61.2, 81.1], [40.9, 74.6]] },
-        { actor: 'F2', style: 'skate', points: [[96.2, 60.4], [36.7, 43.6]] },
-      ],
-    },
-    {
-      moves: [
-        { actor: 'F2', style: 'skate', points: [[36.7, 43.6], [22.9, 39.6]] },
-        { actor: 'F1', style: 'skate-puck', points: [[40.9, 74.6], [29.5, 65.9]] },
-        { actor: 'puck', style: 'pass', speed: 42.16502433248772, to: [24, 39.9], receiver: 'F2' },
-      ],
-    },
-    { moves: [{ actor: 'puck', style: 'shoot', to: [9.4, 42.1] }] },
-  ],
-}
 
 describe('findWaits', () => {
   it('finds both forwards standing still before the pass arrives', () => {
