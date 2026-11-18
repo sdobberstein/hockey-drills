@@ -12,7 +12,7 @@ Personal-use web app for creating, animating and sharing hockey drills. Planning
 | Rendering | SVG (same renderer for editor, player and static diagram) |
 | Rink | NHL, 200 x 85 ft. Coordinates in feet, x 0..200, y 0..85 |
 | Data | Local-first JSON, one file per drill |
-| Library | `drills/*.json` in the repo; generated `index.json`; app lists and loads them |
+| Library | `drills/*.json` in the repo, bundled at build time; grouping into progressions is computed from the drills themselves (no index file) |
 | Sharing | Hash links: `#/drill/<id>` and `#/d/<compressed-json>` |
 | Animation | Model C: ordered steps, each containing moves |
 | Progressions | Independent drill files linked by `progression` metadata |
@@ -106,7 +106,7 @@ Three views over one model:
 - **Player**: animate with play, pause, scrub, speed.
 - **Diagram**: static render in international notation, all steps overlaid and numbered.
 
-Library: `drills/*.json`, a build step generates `index.json` (id, title, tags, progression). The library view groups by series and sorts by order. The editor has "Save as new drill from this one" for authoring progression steps.
+Library: `drills/*.json`, bundled by Vite (`import.meta.glob`). There is no generated index: the library view groups drills by `progression.series` and sorts by `order` at runtime, so it cannot go stale. A series of one is shown as a plain drill. Outside drills (a link, a pasted or opened file) go through `parseDrill`: the JSON Schema first (Ajv), then the semantic validator. The editor has "Save as new drill from this one" for authoring progression steps.
 
 Persistence: drafts in localStorage/IndexedDB; import/export `.json`; committing a file to `drills/` is how a drill joins the library.
 
@@ -116,7 +116,7 @@ Sharing: repo drills by id; any drill via deflate + base64url in the URL fragmen
 
 1. **Model and engine**: JSON Schema, semantic validator, position-at-time function, tests with the 2-on-1 fixture.
 2. **Viewer**: rink SVG, actor and line symbols, load a JSON file and animate it.
-3. **Library and share links**: index generation, drill list, hash routing, progression grouping.
+3. **Library and share links** (done): drill list grouped by progression, hash routing, self-contained share links (deflate + base64url), opening a file or pasted JSON, download as `<id>.json`.
 4. **Editor**: actors, paths, steps, undo/redo, save-as-new.
 5. **Static diagram and PNG export.**
 6. **Later**: GIF export, more rink views, practice-plan view, `extends` for progressions if duplication becomes painful.
