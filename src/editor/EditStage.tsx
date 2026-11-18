@@ -159,7 +159,9 @@ export function EditStage(props: Props) {
             stroke="transparent"
             strokeWidth={3.5}
             strokeLinejoin="round"
-            pointerEvents={busy ? 'none' : 'stroke'}
+            // Inert only while drawing, when clicks must add points. With a tool merely
+            // armed they still select, so you can always reach an existing move.
+            pointerEvents={drawing ? 'none' : 'stroke'}
             style={{ cursor: 'pointer' }}
             onPointerDown={(e) => {
               e.stopPropagation()

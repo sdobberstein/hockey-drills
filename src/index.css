@@ -388,3 +388,14 @@ button.active .muted {
   font-size: 0.8rem;
   padding: 3px 8px;
 }
+
+/* On a wide screen the panels stay in view and scroll on their own, so the
+   selected item's properties are never somewhere below the fold. */
+@media (min-width: 901px) {
+  .panels {
+    position: sticky;
+    top: 8px;
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+  }
+}

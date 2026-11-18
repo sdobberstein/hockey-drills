@@ -231,6 +231,8 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
             onSelect={(next) => {
               setSelection(next)
               setMessage('')
+              // Choosing an existing move means you want to edit it, not draw another.
+              if (next?.kind === 'route') stopDrawing()
             }}
             onPlace={(at) => {
               if (!armed) return
@@ -249,7 +251,12 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
                 const carried = plan?.steps[step]?.before.carriers
                 const puck = who?.type === 'puck' ? who.id : [...(carried ?? [])].find(([, carrier]) => carrier === actor)?.[0]
                 if (!puck || !carried?.has(puck)) setMessage('Click the player who has the puck.')
-                else if (drill.steps[step].moves.some((m) => m.actor === puck)) setMessage('The puck already moves in this step. Select its pass to edit it.')
+                else if (drill.steps[step].moves.some((m) => m.actor === puck)) {
+                  // Do not leave a dead end: select the move that is in the way so it can be edited.
+                  stopDrawing()
+                  setSelection({ kind: 'route', step, actor: puck })
+                  setMessage('The puck already moves in this step, so that one is selected for you to edit. Delete it to draw a different one.')
+                }
                 else {
                   setMessage('')
                   setSelection(null)
@@ -258,7 +265,11 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
                 return
               }
               if (who?.carriedBy) setMessage(`${actor} is carried; it moves with ${who.carriedBy}. Draw a route for ${who.carriedBy}.`)
-              else if (drill.steps[step].moves.some((m) => m.actor === actor)) setMessage(`${actor} already has a move in this step. Select its route to edit it.`)
+              else if (drill.steps[step].moves.some((m) => m.actor === actor)) {
+                stopDrawing()
+                setSelection({ kind: 'route', step, actor })
+                setMessage(`${actor} already has a move in this step, so it is selected for you to edit. Delete it to draw a different one.`)
+              }
               else {
                 setMessage('')
                 setSelection(null)
@@ -284,12 +295,6 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
             onVertexDragEnd={editor.endGesture}
           />
           <aside className="panels">
-            <StepList drill={drill} planSteps={plan?.steps ?? []} view={step} onView={goTo} onEdit={editor.edit} />
-            {step === null ? (
-              <Palette armed={armed} onArm={setArmed} />
-            ) : (
-              <RouteTools armed={routeStyle} drawing={drawing !== null} onArm={(s) => { setRouteStyle(s); setDrawing(null); setMessage('') }} />
-            )}
             {selectedActor && <ActorPanel key={selectedActor.id} drill={drill} actor={selectedActor} onEdit={editor.edit} />}
             {selection?.kind === 'route' && selectedMove && (
               <RoutePanel
@@ -302,7 +307,6 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
                 onEdit={editor.edit}
               />
             )}
-            <DetailsPanel drill={drill} onEdit={editor.edit} />
             {result.issues.length > 0 && (
               <Issues
                 title="To finish this drill"
@@ -310,6 +314,13 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
                 onApply={(issue, choice) => editor.edit(applySuggestion(drill, issue.location, choice))}
               />
             )}
+            <StepList drill={drill} planSteps={plan?.steps ?? []} view={step} onView={goTo} onEdit={editor.edit} />
+            {step === null ? (
+              <Palette armed={armed} onArm={setArmed} />
+            ) : (
+              <RouteTools armed={routeStyle} drawing={drawing !== null} onArm={(s) => { setRouteStyle(s); setDrawing(null); setMessage('') }} />
+            )}
+            <DetailsPanel drill={drill} onEdit={editor.edit} />
           </aside>
         </div>
       )}
