@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildTimeline } from './timeline'
-import { validateDrill } from './validate'
+import { parseDrill } from './parse'
 import type { Drill } from './types'
 
 /**
@@ -37,8 +37,9 @@ describe('drill library', () => {
         expect(path.endsWith(`/${drill.id}.json`)).toBe(true)
       })
 
-      it('passes semantic validation', () => {
-        expect(validateDrill(drill)).toEqual([])
+      it('matches the schema and passes semantic validation', () => {
+        // The same door a shared link goes through (see parse.ts).
+        expect(parseDrill(drill).issues).toEqual([])
       })
 
       it('never teleports anyone across a step boundary', () => {
