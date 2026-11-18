@@ -161,6 +161,8 @@ Related, if hand-computed timing keeps hurting: because steps are sync points, a
 
 **Correctness criterion.** For any drill, `compile(import(drill))` must behave the same as `drill`: the same position for every actor at every moment (puck within the receive tolerance). The tests check this across every library drill and the reported stop-and-start drill.
 
-**Known limits of the first version.** Step names and notes are not carried (only event names). An interval in which nobody moves cannot be a step, so a pause with no one moving is reported and removed.
+**Step names and notes** are kept as `phases`: each marks where a named stretch begins (in seconds, for now) and carries its name and notes. Compile starts a step at each phase and names it, and a phase changes where steps fall, never how anyone moves. When flows become editable, a phase's start will need to be anchored to something that moves with the edit.
 
-**Slices.** A: the pure core and the equivalence tests. B: a read-only timeline that shows each actor's runs and waits and the passes between them, so stops are visible at a glance. C: editing in the flow view (draw a path, add a wait, drag markers, link a pass by clicking two points). D: round-tripping into the editor so a drill can be edited in either view.
+**Known limits of the first version.** An interval in which nobody moves cannot be a step, so a pause with no one moving is reported and removed. A style change or a new run starting while a pass is in the air cannot be represented (a step holds a whole flight) and is reported.
+
+**Slices.** A (done): the pure core and the equivalence tests. B (done): a read-only timeline that shows each actor's runs and waits and the passes between them, so stops are visible at a glance; in the player it is also a scrubber, in the editor it sits under the ice. C: editing in the flow view (draw a path, add a wait, drag markers, link a pass by clicking two points). D: round-tripping into the editor so a drill can be edited in either view.
