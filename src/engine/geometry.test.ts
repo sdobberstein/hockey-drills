@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { distance, pathLength, pointAlong } from './geometry'
+import { distance, nearestAlongPath, pathLength, pointAlong } from './geometry'
 
 describe('geometry', () => {
   it('measures straight-line distance', () => {
@@ -27,5 +27,17 @@ describe('geometry', () => {
 
   it('tolerates zero-length segments', () => {
     expect(pointAlong([[5, 5], [5, 5], [5, 5]], 3)).toEqual([5, 5])
+  })
+
+  it('finds the closest spot on a path and how far along it is', () => {
+    // Directly beside the 15 ft mark of an L-shaped path.
+    const near = nearestAlongPath([[0, 0], [10, 0], [10, 20]], [12, 5])
+    expect(near.distance).toBeCloseTo(2)
+    expect(near.arc).toBeCloseTo(15)
+  })
+
+  it('clamps to the ends of the path', () => {
+    expect(nearestAlongPath([[0, 0], [10, 0]], [-5, 0])).toEqual({ distance: 5, arc: 0 })
+    expect(nearestAlongPath([[0, 0], [10, 0]], [20, 0])).toEqual({ distance: 10, arc: 10 })
   })
 })

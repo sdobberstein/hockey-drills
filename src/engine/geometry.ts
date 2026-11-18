@@ -36,3 +36,33 @@ export function pointAlong(points: readonly Point[], d: number): Point {
   }
   return points[points.length - 1]
 }
+
+export interface Nearest {
+  /** Distance from the query point to the closest spot on the path, in feet. */
+  distance: number
+  /** How far along the path (in feet from its start) that closest spot is. */
+  arc: number
+}
+
+/**
+ * The closest spot on a polyline to `p`, and how far along the path it is.
+ *
+ * "How far along" is what lets us turn a place into a time: a skater at speed
+ * v reaches arc `a` after a / v seconds. The validator uses that to suggest a
+ * pass speed that makes the puck arrive just as the receiver gets there.
+ */
+export function nearestAlongPath(points: readonly Point[], p: Point): Nearest {
+  let best: Nearest = { distance: distance(points[0], p), arc: 0 }
+  let travelled = 0
+  for (let i = 1; i < points.length; i++) {
+    const [ax, ay] = points[i - 1]
+    const [bx, by] = points[i]
+    const length = distance(points[i - 1], points[i])
+    // Project p onto the segment, clamped so we stay on it.
+    const f = length === 0 ? 0 : Math.min(1, Math.max(0, ((p[0] - ax) * (bx - ax) + (p[1] - ay) * (by - ay)) / length ** 2))
+    const d = Math.hypot(p[0] - (ax + (bx - ax) * f), p[1] - (ay + (by - ay) * f))
+    if (d < best.distance) best = { distance: d, arc: travelled + length * f }
+    travelled += length
+  }
+  return best
+}
