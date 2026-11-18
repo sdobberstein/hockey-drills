@@ -145,3 +145,22 @@ Three levels of help, each building on the one before:
 3. **Editor snapping** (partly built in editor slice 3: auto-timing when a pass is drawn to a skating teammate, "Land on", and Apply buttons; automatic re-timing after later edits is not built). Drag the landing spot or the receiver's route and the timing adjusts automatically: the receiver's start of the pass step, or the pass speed, is re-solved so the pass keeps landing on them. The author edits positions, never timing numbers. Open question: which quantity should the editor hold fixed when something moves (pass speed, the receiver's start, or the landing spot); a sensible default is to keep speeds fixed and move positions, with an override.
 
 Related, if hand-computed timing keeps hurting: because steps are sync points, an actor's path often has to be split across steps at one speed. The editor could present a single continuous path per actor and split it at step boundaries itself.
+
+## The continuous (flow) view
+
+**Why.** Authoring step by step makes stops easy to create by accident: a step lasts as long as its slowest move, so anyone who finishes sooner stands waiting. The "Smooth skating" hints detect this, but the cause is the model the author works in.
+
+**Model** (`src/flow/`). A *flow* is an authoring layer over the same drill file; nothing on disk changes.
+- Each actor has one continuous path on their own clock, from t = 0: a list of pieces, either a `run` (style, optional speed, optional smooth, points) or an explicit `wait` (seconds). Waiting is therefore something you chose, not something that happened.
+- A `PuckEvent` is a pass, shot or drop pass. It *leaves* at a marker on the carrier's path ("when F1 reaches here") and *lands* at either a marker on the receiver's path ("where F2 is at this point of their run") or a spot on the ice. A marker is a piece index plus a distance along a run (feet) or time into a wait (seconds), so it survives reshaping a path.
+- For a marker landing the pass speed is **solved from the two times**: speed = flight length / (landing time - release time). If the landing is not after the release, or the speed is not believable, that is reported. For a spot, the speed is given or defaulted.
+
+**Compile to steps.** Step boundaries fall at every release time, at every piece boundary of any actor, and at the end. Every actor's path is cut at those same instants, so every move in a step lasts exactly as long as the step, and nobody can finish early by accident. A smooth run is emitted as its original points (`smooth: true`) when a step covers it whole, and as a dense polyline when a boundary cuts through it, so the geometry is exact. A pass in the air cannot span a boundary (a step holds the whole flight), so a style change while a pass is in the air is reported.
+
+**Import from steps.** The inverse: each actor's routes are joined into one path, idle time becomes an explicit `wait`, and each release becomes an event with markers at the times the step model implies. A drill that stops and starts imports with those stops visible as waits.
+
+**Correctness criterion.** For any drill, `compile(import(drill))` must behave the same as `drill`: the same position for every actor at every moment (puck within the receive tolerance). The tests check this across every library drill and the reported stop-and-start drill.
+
+**Known limits of the first version.** Step names and notes are not carried (only event names). An interval in which nobody moves cannot be a step, so a pause with no one moving is reported and removed.
+
+**Slices.** A: the pure core and the equivalence tests. B: a read-only timeline that shows each actor's runs and waits and the passes between them, so stops are visible at a glance. C: editing in the flow view (draw a path, add a wait, drag markers, link a pass by clicking two points). D: round-tripping into the editor so a drill can be edited in either view.
