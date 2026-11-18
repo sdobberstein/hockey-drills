@@ -430,3 +430,139 @@ button.active .muted {
   gap: 6px;
   margin: 8px 0;
 }
+
+.stage-col {
+  min-width: 0;
+}
+
+/* The timeline: a row for each skater and the puck on one shared clock. */
+.timeline {
+  margin-top: 12px;
+}
+
+.tl-grid {
+  --label: 4.5rem;
+  --row: 26px;
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--label) 1fr;
+  row-gap: 2px;
+  user-select: none;
+}
+
+.tl-grid.seekable {
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.tl-axis {
+  position: relative;
+  height: 28px;
+  font-size: 0.7rem;
+  color: #666;
+  border-bottom: 1px solid #d4d8de;
+}
+
+.tl-tick {
+  position: absolute;
+  bottom: 2px;
+  transform: translateX(-50%);
+}
+
+.tl-step {
+  position: absolute;
+  top: 0;
+  max-width: 8rem;
+  padding-left: 3px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.tl-label {
+  display: flex;
+  align-items: center;
+  height: var(--row);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.tl-label.puck {
+  color: #555;
+  font-weight: 400;
+}
+
+.tl-track {
+  position: relative;
+  height: var(--row);
+  background: #f4f6f8;
+  border-radius: 4px;
+}
+
+.tl-piece {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  overflow: hidden;
+  padding: 0 4px;
+  font-size: 0.7rem;
+  line-height: 22px;
+  white-space: nowrap;
+  border-radius: 3px;
+  box-sizing: border-box;
+}
+
+.tl-run {
+  background: #7fa6e8;
+  color: #0b2a5e;
+}
+.tl-skate-puck { background: #8c8fe6; color: #20225c; }
+.tl-backward { background: #6cc4b8; color: #0a3b35; }
+.tl-lateral { background: #c79be0; color: #3d1457; }
+.tl-pivot { background: #e0a0c4; color: #5a1238; }
+.tl-stop, .tl-check { background: #b0b7c3; color: #2a2f38; }
+
+.tl-wait {
+  background-image: repeating-linear-gradient(135deg, transparent 0 4px, rgba(0, 0, 0, 0.1) 4px 6px);
+  color: #444;
+}
+.tl-wait.tl-stop { background-color: #ffd37a; color: #5a3c00; }
+.tl-wait.tl-delay { background-color: #cfdbe8; }
+.tl-wait.tl-rest { background-color: #e6e9ed; }
+
+.tl-carried { background: #d9ead3; color: #1f4d17; }
+.tl-flight { background: #f4b183; color: #5a2a00; }
+.tl-loose { background: #eceff3; }
+
+.tl-overlay {
+  position: absolute;
+  top: 30px;
+  left: var(--label);
+  right: 0;
+  pointer-events: none;
+}
+
+.tl-stepline {
+  stroke: #9aa5b5;
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.tl-link {
+  stroke: #b3541e;
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.tl-landing {
+  fill: #b3541e;
+}
+
+.tl-playhead {
+  stroke: #c8102e;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
