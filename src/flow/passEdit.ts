@@ -1,7 +1,7 @@
-import { nearestAlongPath } from '../engine/geometry'
+import { distance, nearestAlongPath, pointAlong } from '../engine/geometry'
 import type { MoveStyle, Point } from '../engine/types'
 import type { Starts } from './edit'
-import { RELEASE_STYLES } from '../editor/releases'
+import { MAX_PASS_SPEED, MIN_PASS_SPEED, RELEASE_STYLES } from '../editor/releases'
 import { markerTime, segmentsFor } from './timeline'
 import { isAfter, type EventTarget, type Flow, type Marker, type PuckEvent, type After } from './types'
 
@@ -96,4 +96,114 @@ export function setPassSpeed(flow: Flow, index: number, speed: number | null): F
   if (speed === null) delete next.speed
   else next.speed = speed
   return { ...flow, events: flow.events.map((x, i) => (i === index ? next : x)) }
+}
+
+// --- where could it land? --------------------------------------------------------
+
+/** Where and when a pass leaves, for working out where it could land. */
+export interface Release {
+  point: Point
+  time: number
+}
+
+export type Believability =
+  | { ok: true; speed: number }
+  | { ok: false; reason: 'too-soon' | 'too-fast' | 'too-slow'; speed: number | null; seconds: number }
+
+/**
+ * Whether a pass from `from` could land at a place and time. It needs the
+ * receiver to get there after the pass leaves, and the speed that implies
+ * (flight length / flight time) to be one a pass can have.
+ */
+export function believable(from: Release, point: Point, time: number): Believability {
+  const seconds = time - from.time
+  if (seconds <= 1e-3) return { ok: false, reason: 'too-soon', speed: null, seconds }
+  const speed = distance(from.point, point) / seconds
+  if (speed > MAX_PASS_SPEED) return { ok: false, reason: 'too-fast', speed, seconds }
+  if (speed < MIN_PASS_SPEED) return { ok: false, reason: 'too-slow', speed, seconds }
+  return { ok: true, speed }
+}
+
+/** A stretch of one run where a pass from `from` could land. */
+export interface LandingZone {
+  actor: string
+  piece: number
+  /** Arc length (feet along the run) at the start and end of the stretch. */
+  from: number
+  to: number
+  /** The stretch as points on the ice, for drawing. */
+  points: Point[]
+}
+
+/** How finely a run is checked, in feet. */
+const SAMPLE = 0.5
+
+/**
+ * Every stretch of every other skater's path where a pass leaving `from` could
+ * land: after it leaves, and at a believable speed. A skater who is waiting has
+ * no place on the ice, so only runs count.
+ *
+ * It samples each run every half foot and joins consecutive believable samples,
+ * which is plenty for a path that is tens of feet long and keeps the answer
+ * honest: every sample inside a stretch is believable, and none outside is.
+ */
+export function landingZones(flow: Flow, starts: Starts, from: Release, passer: string): LandingZone[] {
+  const zones: LandingZone[] = []
+  for (const [actor, pieces] of Object.entries(flow.paths)) {
+    if (actor === passer) continue
+    for (const seg of segmentsFor(pieces, starts[actor])) {
+      if (seg.piece.kind !== 'run' || seg.length <= 0) continue
+      const steps = Math.max(1, Math.ceil(seg.length / SAMPLE))
+      let open: { from: number; points: Point[] } | null = null
+      const close = (to: number) => {
+        if (open && open.points.length > 0) zones.push({ actor, piece: seg.index, from: open.from, to, points: open.points })
+        open = null
+      }
+      for (let i = 0; i <= steps; i++) {
+        const arc = (seg.length * i) / steps
+        const point = pointAlong(seg.geometry, arc)
+        if (believable(from, point, seg.t0 + arc / seg.speed).ok) {
+          if (!open) open = { from: arc, points: [] }
+          open.points.push(point)
+        } else close(arc)
+      }
+      close(seg.length)
+    }
+  }
+  return zones
+}
+
+export interface LandingSnap {
+  marker: Marker
+  point: Point
+  /** How far the click was from where it snapped to, in feet. */
+  distance: number
+}
+
+/** The believable landing nearest a click, if one is within `radius` feet. This is what lets you aim at an area. */
+export function snapToLanding(zones: readonly LandingZone[], click: Point, radius: number, only?: string): LandingSnap | null {
+  let best: LandingSnap | null = null
+  for (const zone of zones) {
+    if (only !== undefined && zone.actor !== only) continue
+    const steps = zone.points.length - 1
+    zone.points.forEach((point, i) => {
+      const d = distance(point, click)
+      if (d > radius || (best && d >= best.distance)) return
+      const arc = steps <= 0 ? zone.from : zone.from + ((zone.to - zone.from) * i) / steps
+      best = { marker: { actor: zone.actor, piece: zone.piece, at: arc }, point, distance: d }
+    })
+  }
+  return best
+}
+
+/** A sentence for why a landing is not believable, with what would make it so. */
+export function explain(b: Extract<Believability, { ok: false }>, receiver: string, passer: string): string {
+  switch (b.reason) {
+    case 'too-soon':
+      return `${receiver} gets there before the pass can leave ${passer}. Pick a spot further along ${receiver}'s path.`
+    case 'too-fast':
+      return `The pass would need ${Math.round(b.speed ?? 0)} ft/s to reach ${receiver} there in ${b.seconds.toFixed(2)} s. Pick a spot further along their path.`
+    case 'too-slow':
+      return `The pass would only travel ${Math.round(b.speed ?? 0)} ft/s to reach ${receiver} there, taking ${b.seconds.toFixed(2)} s. Pick a spot earlier on their path.`
+  }
 }

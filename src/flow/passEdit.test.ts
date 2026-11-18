@@ -6,9 +6,11 @@ import { editViaFlow } from './apply'
 import { compileFlow } from './compile'
 import type { Starts } from './edit'
 import { drillToFlow } from './import'
-import { addPass, endMarker, followers, locateOnPath, removePass, setPassSpeed, setPassStyle } from './passEdit'
+import { addPass, believable, endMarker, explain, followers, landingZones, locateOnPath, removePass, setPassSpeed, setPassStyle, snapToLanding } from './passEdit'
+import { segmentsFor } from './timeline'
 import { buildTimelineModel, carrierAtTime, puckCarriedBy } from './view'
 import type { Flow } from './types'
+import { pointAlong } from '../engine/geometry'
 
 const starts: Starts = { F1: [0, 0], F2: [0, 50] }
 
@@ -216,5 +218,118 @@ describe('linking a pass in a flow, then compiling', () => {
     const removed = editViaFlow(withPass, (f) => removePass(f, 0))!
     expect(removed.drill.steps.flatMap((x) => x.moves).some((m) => m.style === 'pass')).toBe(false)
     expect(drillToFlow(removed.drill)!.events).toHaveLength(0)
+  })
+})
+
+describe('believable', () => {
+  const from = { point: [0, 0] as [number, number], time: 1 }
+
+  it('accepts a landing a pass can reach in the time', () => {
+    const b = believable(from, [60, 0], 2) // 60 ft in 1 s
+    expect(b).toEqual({ ok: true, speed: 60 })
+  })
+
+  it('rejects one that is not after the pass leaves', () => {
+    expect(believable(from, [10, 0], 1)).toMatchObject({ ok: false, reason: 'too-soon' })
+    expect(believable(from, [10, 0], 0.5)).toMatchObject({ ok: false, reason: 'too-soon' })
+  })
+
+  it('rejects one that would need an impossible speed, or an absurdly slow one', () => {
+    expect(believable(from, [200, 0], 1.5)).toMatchObject({ ok: false, reason: 'too-fast' })
+    expect(believable(from, [5, 0], 3)).toMatchObject({ ok: false, reason: 'too-slow' })
+  })
+})
+
+describe('landingZones', () => {
+  /** F1 carries along y = 0; F2 skates parallel along y = 30. The pass leaves F1 at x = 60. */
+  const parallel = (): Flow => ({
+    paths: {
+      F1: [{ kind: 'run', style: 'skate-puck', points: [[0, 0], [200, 0]] }],
+      F2: [{ kind: 'run', style: 'skate', points: [[0, 30], [200, 30]] }],
+    },
+    events: [],
+  })
+  const s: Starts = { F1: [0, 0], F2: [0, 30] }
+  const release = { point: [60, 0] as [number, number], time: 60 / 22 }
+
+  it('finds a stretch of F2\'s path, and none on the passer\'s own', () => {
+    const zones = landingZones(parallel(), s, release, 'F1')
+    expect(zones.length).toBeGreaterThan(0)
+    expect(zones.every((z) => z.actor === 'F2')).toBe(true)
+  })
+
+  it('every sample inside a zone is believable, and none outside is', () => {
+    const f = parallel()
+    const zones = landingZones(f, s, release, 'F1')
+    const f2 = segmentsFor(f.paths.F2, s.F2)[0]
+    for (let arc = 0; arc <= f2.length; arc += 0.5) {
+      const ok = believable(release, pointAlong(f2.geometry, arc), f2.t0 + arc / f2.speed).ok
+      const inside = zones.some((z) => arc >= z.from - 0.51 && arc <= z.to + 0.51)
+      if (ok) expect(inside, `arc ${arc} is believable but not in a zone`).toBe(true)
+    }
+    for (const z of zones) for (const point of z.points) {
+      // every drawn point of a zone must itself be believable
+      const arc = z.from + ((z.to - z.from) * z.points.indexOf(point)) / Math.max(1, z.points.length - 1)
+      expect(believable(release, point, f2.t0 + arc / f2.speed).ok).toBe(true)
+    }
+  })
+
+  it('leaves out the part of the path F2 reaches before the pass leaves', () => {
+    const zones = landingZones(parallel(), s, release, 'F1')
+    const earliest = Math.min(...zones.map((z) => z.from))
+    expect(earliest).toBeGreaterThan(60) // F2 is at x = 60 at 2.4 s, before the pass leaves at 2.7 s
+  })
+
+  it('finds nothing when the only other skater is at the wrong place and time', () => {
+    const f = parallel()
+    f.paths.F2 = [{ kind: 'run', style: 'skate', points: [[0, 30], [10, 30]] }] // done almost at once
+    expect(landingZones(f, s, release, 'F1')).toEqual([])
+  })
+
+  it('ignores a skater who is only waiting', () => {
+    const f = parallel()
+    f.paths.F2 = [{ kind: 'wait', seconds: 9 }]
+    expect(landingZones(f, s, release, 'F1')).toEqual([])
+  })
+})
+
+describe('snapToLanding', () => {
+  const f: Flow = {
+    paths: {
+      F1: [{ kind: 'run', style: 'skate-puck', points: [[0, 0], [200, 0]] }],
+      F2: [{ kind: 'run', style: 'skate', points: [[0, 30], [200, 30]] }],
+    },
+    events: [],
+  }
+  const s: Starts = { F1: [0, 0], F2: [0, 30] }
+  const zones = landingZones(f, s, { point: [60, 0], time: 60 / 22 }, 'F1')
+
+  it('moves a click in the area onto the believable path, so you can aim at an area', () => {
+    const near = zones[0].points[Math.floor(zones[0].points.length / 2)]
+    const snap = snapToLanding(zones, [near[0], near[1] + 4], 7)!
+    expect(snap.marker.actor).toBe('F2')
+    expect(snap.distance).toBeLessThan(5)
+    expect(snap.point[1]).toBeCloseTo(30) // back on F2's path
+  })
+
+  it('gives a marker that really is believable', () => {
+    const near = zones[0].points[0]
+    const snap = snapToLanding(zones, near, 7)!
+    const seg = segmentsFor(f.paths.F2, s.F2)[0]
+    expect(believable({ point: [60, 0], time: 60 / 22 }, snap.point, seg.t0 + snap.marker.at / seg.speed).ok).toBe(true)
+  })
+
+  it('gives nothing when the click is too far from every zone, or for the wrong skater', () => {
+    expect(snapToLanding(zones, [0, 80], 7)).toBeNull()
+    expect(snapToLanding(zones, zones[0].points[0], 7, 'F3')).toBeNull()
+  })
+})
+
+describe('explain', () => {
+  it('says why, and which way to move', () => {
+    expect(explain({ ok: false, reason: 'too-soon', speed: null, seconds: -0.4 }, 'F2', 'F1')).toContain('before the pass can leave')
+    expect(explain({ ok: false, reason: 'too-fast', speed: 140, seconds: 0.3 }, 'F2', 'F1')).toContain('140 ft/s')
+    expect(explain({ ok: false, reason: 'too-fast', speed: 140, seconds: 0.3 }, 'F2', 'F1')).toContain('further along')
+    expect(explain({ ok: false, reason: 'too-slow', speed: 9, seconds: 4 }, 'F2', 'F1')).toContain('earlier')
   })
 })
