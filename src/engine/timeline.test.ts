@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { twoOnOne } from './fixtures'
-import { buildTimeline } from './timeline'
+import { buildTimeline, stepIndexAt } from './timeline'
 
 const timeline = buildTimeline(twoOnOne)
 const [attack, pass, walkIn, shot] = timeline.plan.steps
@@ -61,5 +61,12 @@ describe('buildTimeline (2-on-1)', () => {
       expect(after[id][0]).toBeCloseTo(before[id][0], 3)
       expect(after[id][1]).toBeCloseTo(before[id][1], 3)
     }
+  })
+
+  it('reports which step is in progress', () => {
+    expect(stepIndexAt(timeline.plan, 0)).toBe(0)
+    expect(stepIndexAt(timeline.plan, pass.start)).toBe(1)
+    expect(stepIndexAt(timeline.plan, walkIn.start + 0.01)).toBe(2)
+    expect(stepIndexAt(timeline.plan, timeline.duration)).toBe(3)
   })
 })

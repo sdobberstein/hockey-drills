@@ -66,12 +66,18 @@ function frameAt(plan: Plan, t: number): Frame {
   return frame
 }
 
-/** The step in progress at `time`: the last one that has already started. */
-function stepAt(plan: Plan, time: number): PlannedStep {
-  let found = plan.steps[0]
-  for (const step of plan.steps) {
-    if (step.start <= time) found = step
-    else break
-  }
+/**
+ * Index of the step in progress at `time`: the last one that has already
+ * started. Used by the player to highlight the current step.
+ */
+export function stepIndexAt(plan: Plan, time: number): number {
+  let found = 0
+  plan.steps.forEach((step, i) => {
+    if (step.start <= time) found = i
+  })
   return found
+}
+
+function stepAt(plan: Plan, time: number): PlannedStep {
+  return plan.steps[stepIndexAt(plan, time)]
 }
