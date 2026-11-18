@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { cycleGiveAndGo, twoOnOne } from './fixtures'
-import { buildTimeline, stepIndexAt } from './timeline'
+import { clone, cycleGiveAndGo, twoOnOne } from './fixtures'
+import { buildTimeline, headingAt, headingsAt, stepIndexAt } from './timeline'
 
 const timeline = buildTimeline(twoOnOne)
 const [attack, pass, walkIn, shot] = timeline.plan.steps
@@ -99,5 +99,44 @@ describe('banked pass to a skating receiver (Cycle Give and Go)', () => {
     const f1Start = tl.at(bump.start).F1
     const f1Soon = tl.at(bump.start + 0.2).F1
     expect(Math.hypot(f1Soon[0] - f1Start[0], f1Soon[1] - f1Start[1])).toBeGreaterThan(3)
+  })
+})
+
+describe('headingAt: which way someone is going', () => {
+  const tl = buildTimeline(cycleGiveAndGo)
+
+  it('is the direction of travel, as a unit vector', () => {
+    const h = headingAt(tl, 'F1', 0.5)!
+    expect(Math.hypot(h[0], h[1])).toBeCloseTo(1)
+  })
+
+  it('points left for a skater going left (F1 starts at the right-hand boards)', () => {
+    expect(headingAt(tl, 'F1', 0.5)![0]).toBeLessThan(-0.8)
+  })
+
+  it('keeps the way they were heading once they have stopped', () => {
+    const during = headingAt(tl, 'F2', 1.0)! // F2 skates right along the boards early on
+    const after = headingAt(tl, 'F2', tl.duration)! // finished long ago
+    expect(after[0] * during[0] + after[1] * during[1]).toBeGreaterThan(-1) // a real heading, not null
+    expect(Math.hypot(after[0], after[1])).toBeCloseTo(1)
+  })
+
+  it('looks ahead for someone who has not started moving yet', () => {
+    const d = clone(twoOnOne)
+    d.steps = [
+      { moves: [{ actor: 'F1', style: 'skate', points: [[95, 25], [140, 25]] }] },
+      { moves: [{ actor: 'F2', style: 'skate', points: [[95, 60], [95, 40]] }] }, // F2 waits, then goes up the ice
+    ]
+    const wait = buildTimeline(d)
+    const h = headingAt(wait, 'F2', 0)!
+    expect(h[1]).toBeLessThan(-0.9) // toward lower y, the way it will go
+  })
+
+  it('is null for someone who never moves, and left out of headingsAt', () => {
+    expect(headingAt(tl, 'puck', 0.5)).not.toBeNull() // the puck rides its carrier
+    const d = { ...twoOnOne, actors: [...twoOnOne.actors, { id: 'cone', type: 'pylon' as const, start: [1, 1] as [number, number] }] }
+    const t2 = buildTimeline(d)
+    expect(headingAt(t2, 'cone', 1)).toBeNull()
+    expect(Object.keys(headingsAt(t2, ['F1', 'cone'], 1))).toEqual(['F1'])
   })
 })

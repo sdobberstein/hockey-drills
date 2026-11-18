@@ -20,12 +20,65 @@ export interface Timeline {
  * That is what makes it easy to unit test (PLAN.md, "Data model").
  */
 export function buildTimeline(drill: Drill): Timeline {
-  const plan = planDrill(drill)
+  return timelineOf(planDrill(drill))
+}
+
+/** A timeline over a plan that has already been made, so callers that need both do not plan twice. */
+export function timelineOf(plan: Plan): Timeline {
   return {
     duration: plan.duration,
     plan,
     at: (t) => frameAt(plan, t),
   }
+}
+
+/** A unit direction: which way something is facing or heading. */
+export type Heading = readonly [x: number, y: number]
+
+/** How far each side of a moment to look when working out the way someone is moving, in seconds. */
+const HEADING_WINDOW = 0.1
+
+/**
+ * Which way an actor is heading at a moment, as a unit vector, or null if they
+ * never move.
+ *
+ * It looks a little either side, so a skater going round a bend turns smoothly
+ * instead of snapping. A skater who is standing still keeps the way they were
+ * last heading, or if they have not moved yet, the way they are about to: a
+ * puck should stay out in front of someone who has stopped, not swing round to
+ * some arbitrary side.
+ */
+export function headingAt(timeline: Timeline, id: string, t: number): Heading | null {
+  const direction = (from: number, to: number): Heading | null => {
+    const a = timeline.at(from)[id]
+    const b = timeline.at(to)[id]
+    if (!a || !b) return null
+    const dx = b[0] - a[0]
+    const dy = b[1] - a[1]
+    const d = Math.hypot(dx, dy)
+    return d > 1e-4 ? [dx / d, dy / d] : null
+  }
+  const now = direction(t - HEADING_WINDOW, t + HEADING_WINDOW) ?? direction(t, t + HEADING_WINDOW) ?? direction(t - HEADING_WINDOW, t)
+  if (now) return now
+  for (let s = t - 2 * HEADING_WINDOW; s >= -1e-9; s -= HEADING_WINDOW) {
+    const h = direction(s, s + HEADING_WINDOW)
+    if (h) return h
+  }
+  for (let s = t + HEADING_WINDOW; s <= timeline.duration; s += HEADING_WINDOW) {
+    const h = direction(s, s + HEADING_WINDOW)
+    if (h) return h
+  }
+  return null
+}
+
+/** The heading of each of these actors at a moment; those who never move are left out. */
+export function headingsAt(timeline: Timeline, ids: readonly string[], t: number): Record<string, Heading> {
+  const out: Record<string, Heading> = {}
+  for (const id of ids) {
+    const h = headingAt(timeline, id, t)
+    if (h) out[id] = h
+  }
+  return out
 }
 
 function frameAt(plan: Plan, t: number): Frame {
