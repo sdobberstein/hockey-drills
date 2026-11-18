@@ -37,6 +37,12 @@ describe('the timeline model', () => {
     expect(spans.map((s) => s.flight ?? s.carrier)).toEqual(['F1', 'pass', 'F2', 'shoot'])
   })
 
+  it('marks a shot taken as the puck arrives as chained to the pass before it', () => {
+    expect(model.links.map((l) => l.chained)).toEqual([false, true])
+    // A hold between the pass and the next release (F2 carries it for a while) is not chained.
+    expect(buildTimelineModel(twoOnOne)!.links.map((l) => l.chained)).toEqual([false, false])
+  })
+
   it('joins the pass to the skater it reaches', () => {
     expect(model.links[0]).toMatchObject({ style: 'pass', from: { actor: 'F1' }, to: { actor: 'F2' } })
     expect(model.links[1]).toMatchObject({ style: 'shoot', from: { actor: 'F2' }, to: { actor: null } })

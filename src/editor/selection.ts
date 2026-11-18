@@ -1,9 +1,13 @@
 import type { Point } from '../engine/types'
 
-/** What is selected in the editor: an actor, or one actor's route in a step. */
+/**
+ * What is selected in the editor: an actor, one actor's route in a step, or a
+ * block on the timeline (a run or a wait, by actor and position in their path).
+ */
 export type Selection =
   | { kind: 'actor'; id: string }
   | { kind: 'route'; step: number; actor: string }
+  | { kind: 'piece'; actor: string; piece: number }
   | null
 
 /** A route being drawn, one click at a time. The first point is where the actor stands. */

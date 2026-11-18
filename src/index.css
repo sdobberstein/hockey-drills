@@ -496,6 +496,7 @@ button.active .muted {
 
 .tl-track {
   position: relative;
+  overflow: hidden;
   height: var(--row);
   background: #f4f6f8;
   border-radius: 4px;
@@ -565,4 +566,44 @@ button.active .muted {
   stroke: #c8102e;
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
+}
+
+.tl-piece.pickable {
+  cursor: pointer;
+}
+
+.tl-piece.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  z-index: 1;
+}
+
+.tl-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 7px;
+  cursor: ew-resize;
+  background: rgba(0, 0, 0, 0.12);
+  opacity: 0;
+}
+
+.tl-piece:hover .tl-handle,
+.tl-piece.selected .tl-handle {
+  opacity: 1;
+}
+
+.tl-passend {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #b3541e;
+  box-shadow: 0 0 0 1px #b3541e;
+  cursor: ew-resize;
+  z-index: 2;
 }

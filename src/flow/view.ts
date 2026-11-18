@@ -55,6 +55,12 @@ export interface TimelineLink {
   style: MoveStyle
   from: { actor: string; t: number }
   to: { actor: string | null; t: number }
+  /**
+   * It leaves the moment the previous pass lands on this carrier (a shot taken
+   * as the puck is received), so it moves with that landing and has no end of
+   * its own to drag. Drawing one would sit exactly on top of the landing.
+   */
+  chained: boolean
 }
 
 export interface TimelineModel {
@@ -129,10 +135,11 @@ export function buildTimelineModel(drill: Drill): TimelineModel | null {
     duration: plan.duration,
     rows,
     pucks,
-    links: flights.map((f) => ({
+    links: flights.map((f, i) => ({
       style: f.style,
       from: { actor: f.carrier, t: f.t0 },
       to: { actor: f.receiver ?? null, t: f.t1 },
+      chained: flights.some((g, j) => j < i && g.puck === f.puck && g.receiver === f.carrier && Math.abs(g.t1 - f.t0) <= 0.005),
     })),
     steps: plan.steps.map((s, i) => ({ start: s.start, ...(drill.steps[i].name ? { name: drill.steps[i].name } : {}) })),
   }
