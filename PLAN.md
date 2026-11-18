@@ -118,6 +118,7 @@ Sharing: repo drills by id; any drill via deflate + base64url in the URL fragmen
 2. **Viewer**: rink SVG, actor and line symbols, load a JSON file and animate it.
 3. **Library and share links** (done): drill list grouped by progression, hash routing, self-contained share links (deflate + base64url), opening a file or pasted JSON, download as `<id>.json`.
 4. **Editor**: actors, paths, steps, undo/redo, save-as-new.
+   Built in slices. **Slice 1 (done):** add, move, relabel and delete actors, set who carries a puck, edit title/description/tags/rink view, undo/redo (a drag is one step), drafts autosaved to localStorage, download as JSON, preview. **Slice 2:** draw and edit paths within a step, a step list, live validation. **Slice 3:** a pass tool where the landing helper re-solves timing as you drag (authoring helpers, level 3). **Slice 4:** save as a new drill, progression steps. Agreed design: authors will draw one continuous path per actor and the editor splits it across steps (the file format stays per-step); when timing is re-solved the editor keeps speeds fixed and moves positions, with an override.
 5. **Static diagram and PNG export.**
 6. **Later**: GIF export, more rink views, practice-plan view, `extends` for progressions if duplication becomes painful.
 
