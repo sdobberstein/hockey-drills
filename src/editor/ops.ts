@@ -1,4 +1,6 @@
-import type { Actor, ActorType, Drill, Move, Point, RinkView } from '../engine/types'
+import type { Actor, ActorType, Drill, Point, RinkView } from '../engine/types'
+import { clampToRink } from './rink'
+import { reanchor } from './routes'
 
 /**
  * Editing operations on a drill. Each is a pure function: it takes a drill and
@@ -12,15 +14,9 @@ import type { Actor, ActorType, Drill, Move, Point, RinkView } from '../engine/t
  * edit cannot be made safely, the operation returns the drill unchanged.
  */
 
-const RINK_LENGTH = 200
-const RINK_WIDTH = 85
-
-/** Keep a point on the ice, rounded to a tenth of a foot (finer than anyone can place by hand). */
-export function clampToRink(p: Point): Point {
-  const x = Math.min(RINK_LENGTH, Math.max(0, p[0]))
-  const y = Math.min(RINK_WIDTH, Math.max(0, p[1]))
-  return [Math.round(x * 10) / 10, Math.round(y * 10) / 10]
-}
+// Re-exported so existing imports of clampToRink from here keep working; it lives
+// in rink.ts so that routes.ts can use it without importing this module back.
+export { clampToRink } from './rink'
 
 export function blankDrill(id: string): Drill {
   return { version: 1, id, title: 'Untitled drill', rink: 'full', actors: [], steps: [] }
@@ -69,33 +65,18 @@ export function addActor(drill: Drill, type: ActorType, at: Point): { drill: Dri
  * Move an actor's starting position.
  *
  * Its first path must still begin where it stands, or the validator would say
- * it teleports at the start of its first move; so the first point of that
- * path moves with it. Later steps are left alone: they begin where the
- * previous step ended, which has not changed. A carried actor (a puck on a
- * player) cannot be moved on its own; move its carrier.
+ * it teleports at the start of its first move, so routes are re-anchored
+ * (see reanchor in routes.ts). A carried actor (a puck on a player) cannot be
+ * moved on its own; move its carrier.
  */
 export function moveActor(drill: Drill, id: string, to: Point): Drill {
   const actor = drill.actors.find((a) => a.id === id)
   if (!actor || actor.carriedBy) return drill
   const start = clampToRink(to)
-
-  let reanchored = false
-  const steps = drill.steps.map((step) => {
-    if (reanchored) return step
-    const index = step.moves.findIndex((m) => m.actor === id)
-    if (index === -1) return step
-    reanchored = true // the first step this actor moves in is the only one to adjust
-    const move = step.moves[index]
-    if (!move.points) return step
-    const moved: Move = { ...move, points: [start, ...move.points.slice(1)] }
-    return { ...step, moves: step.moves.map((m, i) => (i === index ? moved : m)) }
-  })
-
-  return {
+  return reanchor({
     ...drill,
     actors: drill.actors.map((a) => (a.id === id ? { ...a, start } : a)),
-    steps,
-  }
+  })
 }
 
 /** Change an actor's label or colour. An empty label or colour clears it. */
