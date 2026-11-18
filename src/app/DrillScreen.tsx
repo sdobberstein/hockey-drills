@@ -1,4 +1,4 @@
-import { libraryHash, drillHash } from './route'
+import { drillHash, editHash, libraryHash } from './route'
 import type { Drill } from '../engine/types'
 import { libraryDrills } from '../library/drills'
 import { neighbours, seriesTitle } from '../library/library'
@@ -13,6 +13,7 @@ export function DrillScreen({ drill, inLibrary }: { drill: Drill; inLibrary: boo
     <>
       <nav className="crumbs">
         <a href={libraryHash()}>← Library</a>
+        {inLibrary && <a href={editHash(drill.id)}>Edit a copy</a>}
         {!inLibrary && <span className="badge">Shared drill, not in the library</span>}
       </nav>
 

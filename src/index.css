@@ -177,3 +177,150 @@ h1 a {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+a.button {
+  display: inline-block;
+  padding: 6px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.drafts ul {
+  list-style: none;
+  padding: 0;
+}
+
+.drafts li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 6px 0;
+}
+
+.editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.danger {
+  color: #c8102e;
+  border-color: #e3a5af;
+}
+
+.stage {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #d4d8de;
+  border-radius: 8px;
+  background: #fff;
+  touch-action: none;
+  user-select: none;
+}
+
+.stage.armed {
+  cursor: crosshair;
+}
+
+.actor {
+  cursor: grab;
+}
+
+.actor.carried {
+  cursor: default;
+}
+
+.panels section {
+  border: 1px solid #d4d8de;
+  border-radius: 8px;
+  padding: 8px 12px 12px;
+  margin-bottom: 12px;
+}
+
+.panels h3 {
+  margin: 4px 0 8px;
+  font-size: 1rem;
+}
+
+.field {
+  display: block;
+  margin: 8px 0;
+}
+
+.field > span:first-child {
+  display: block;
+  font-size: 0.8rem;
+  color: #555;
+}
+
+.field input[type='text'],
+.field textarea,
+.field select {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+}
+
+.inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.palette {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.palette button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-align: left;
+}
+
+.hint,
+.muted {
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.panels .issues {
+  border-color: #e0c36a;
+  background: #fffaf0;
+}
+
+.panels .issues h2 {
+  font-size: 0.95rem;
+  margin: 4px 0;
+}
+
+.panels .issues ul {
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+}
