@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "id": "2-on-1",
+  "title": "2-on-1 Rush",
+  "description": "Two forwards attack one defender: carry, pass across, shoot.",
+  "tags": ["rush", "offence"],
+  "rink": "full",
+  "progression": { "series": "two-on-one", "order": 2 },
+  "actors": [
+    { "id": "F1", "type": "forward", "start": [95, 25] },
+    { "id": "F2", "type": "forward", "start": [95, 60] },
+    { "id": "D", "type": "defender", "start": [140, 42] },
+    { "id": "puck", "type": "puck", "start": [95, 25], "carriedBy": "F1" }
+  ],
+  "steps": [
+    {
+      "name": "Attack",
+      "moves": [
+        { "actor": "F1", "style": "skate-puck", "speed": 25, "points": [[95, 25], [150, 28]] },
+        { "actor": "F2", "style": "skate", "speed": 25, "points": [[95, 60], [155, 58]] },
+        { "actor": "D", "style": "backward", "speed": 12, "points": [[140, 42], [150, 38]] }
+      ]
+    },
+    {
+      "name": "Pass",
+      "moves": [{ "actor": "puck", "style": "pass", "speed": 60, "to": "F2" }]
+    },
+    {
+      "name": "Shot",
+      "moves": [
+        { "actor": "F2", "style": "skate", "speed": 15, "points": [[155, 58], [165, 55]] },
+        { "actor": "puck", "style": "shoot", "speed": 80, "to": [189, 42] }
+      ]
+    }
+  ]
+}
