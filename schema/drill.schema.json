@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/hockey-drills/drill.schema.json",
+  "title": "Hockey Drill",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "id", "title", "rink", "actors", "steps"],
+  "properties": {
+    "version": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+    "title": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "tags": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "rink": { "enum": ["full", "half-right", "half-left", "half-top", "half-bottom"] },
+    "progression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["series", "order"],
+      "properties": {
+        "series": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+        "order": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "actors": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/actor" }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/step" }
+    }
+  },
+  "$defs": {
+    "point": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "number", "minimum": 0, "maximum": 200 },
+        { "type": "number", "minimum": 0, "maximum": 85 }
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "start"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "type": {
+          "enum": ["forward", "defender", "goalie", "coach", "puck", "pucks", "pylon", "net"]
+        },
+        "label": { "type": "string" },
+        "color": { "type": "string" },
+        "start": { "$ref": "#/$defs/point" },
+        "carriedBy": { "type": "string" }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["moves"],
+      "properties": {
+        "name": { "type": "string" },
+        "notes": { "type": "string" },
+        "moves": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/move" } }
+      }
+    },
+    "move": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actor", "style"],
+      "properties": {
+        "actor": { "type": "string" },
+        "style": {
+          "enum": [
+            "skate", "skate-puck", "backward", "lateral", "pivot",
+            "pass", "shoot", "stop", "drop-pass", "check"
+          ]
+        },
+        "speed": { "type": "number", "exclusiveMinimum": 0, "description": "Feet per second." },
+        "points": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/point" } },
+        "to": {
+          "description": "Target actor id or a point.",
+          "oneOf": [{ "type": "string" }, { "$ref": "#/$defs/point" }]
+        },
+        "smooth": { "type": "boolean", "default": false, "description": "Reserved; ignored in v1." }
+      },
+      "oneOf": [
+        { "required": ["points"], "not": { "required": ["to"] } },
+        { "required": ["to"], "not": { "required": ["points"] } }
+      ]
+    }
+  }
+}
