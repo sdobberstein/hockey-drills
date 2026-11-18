@@ -36,3 +36,7 @@ TypeScript, React and Vite, with SVG for the rink. The design, the data model an
 ## Deployment
 
 Every push to `main` runs the checks, builds the site and publishes it to GitHub Pages (see `.github/workflows/deploy.yml`). Share links point at wherever the app is hosted, so they work for anyone who can open the site.
+
+## Licence
+
+[MIT](LICENSE).
