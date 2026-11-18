@@ -53,6 +53,7 @@ Rules:
 - A step lasts as long as its slowest move; actors not mentioned stay put.
 - A move has either `points` (a path) or `to` (an actor id or a point). Passes and shots normally use `to`.
 - `carriedBy` on an actor (typically the puck) makes it follow that actor until a pass or shot moves it. A pass with `to: <actorId>` hands the puck to that actor on arrival.
+- All moves in a step start together, from the positions at the start of that step. So a puck cannot be released from a carrier who is still moving in the same step; split it into "walk in" then "shoot". A pass target actor is read at the start of the step and must not move in that step. The validator enforces both.
 - `speed` is in ft/s; each style has a default.
 - `rink` is a view crop; coordinates are always full-rink.
 - `smooth` is reserved for later and ignored in v1.
@@ -75,7 +76,7 @@ Playback is a pure function `(drill, t) -> positions`. No DOM, fully unit-testab
     { "id": "F1", "type": "forward",  "start": [95, 25] },
     { "id": "F2", "type": "forward",  "start": [95, 60] },
     { "id": "D",  "type": "defender", "start": [140, 42] },
-    { "id": "puck", "type": "puck",   "start": [97, 25], "carriedBy": "F1" }
+    { "id": "puck", "type": "puck",   "start": [95, 25], "carriedBy": "F1" }
   ],
   "steps": [
     { "name": "Attack", "moves": [
@@ -86,8 +87,10 @@ Playback is a pure function `(drill, t) -> positions`. No DOM, fully unit-testab
     { "name": "Pass", "moves": [
       { "actor": "puck", "style": "pass", "speed": 60, "to": "F2" }
     ]},
+    { "name": "Walk in", "moves": [
+      { "actor": "F2", "style": "skate-puck", "speed": 15, "points": [[155,58],[165,55]] }
+    ]},
     { "name": "Shot", "moves": [
-      { "actor": "F2",   "style": "skate", "speed": 15, "points": [[155,58],[165,55]] },
       { "actor": "puck", "style": "shoot", "speed": 80, "to": [189, 42] }
     ]}
   ]

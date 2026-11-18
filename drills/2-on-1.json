@@ -2,7 +2,7 @@
   "version": 1,
   "id": "2-on-1",
   "title": "2-on-1 Rush",
-  "description": "Two forwards attack one defender: carry, pass across, shoot.",
+  "description": "Two forwards attack one defender: carry, pass across, walk in, shoot.",
   "tags": ["rush", "offence"],
   "rink": "full",
   "progression": { "series": "two-on-one", "order": 2 },
@@ -26,11 +26,12 @@
       "moves": [{ "actor": "puck", "style": "pass", "speed": 60, "to": "F2" }]
     },
     {
+      "name": "Walk in",
+      "moves": [{ "actor": "F2", "style": "skate-puck", "speed": 15, "points": [[155, 58], [165, 55]] }]
+    },
+    {
       "name": "Shot",
-      "moves": [
-        { "actor": "F2", "style": "skate", "speed": 15, "points": [[155, 58], [165, 55]] },
-        { "actor": "puck", "style": "shoot", "speed": 80, "to": [189, 42] }
-      ]
+      "moves": [{ "actor": "puck", "style": "shoot", "speed": 80, "to": [189, 42] }]
     }
   ]
 }
