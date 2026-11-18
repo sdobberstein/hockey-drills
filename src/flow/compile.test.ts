@@ -91,6 +91,56 @@ describe('compiling a flow built by hand', () => {
   })
 })
 
+describe('a release taken as the puck arrives', () => {
+  const chain = (delay?: number): Flow => ({
+    paths: {
+      F1: [{ kind: 'run', style: 'skate-puck', points: [[50, 20], [120, 20]] }],
+      F2: [{ kind: 'run', style: 'skate', speed: 22.5, points: [[50, 60], [120, 45]] }],
+    },
+    events: [
+      { puck: 'puck', style: 'pass', from: { actor: 'F1', piece: 0, at: 40 }, target: { kind: 'marker', marker: { actor: 'F2', piece: 0, at: 55 } } },
+      { puck: 'puck', style: 'shoot', from: delay === undefined ? { after: 0 } : { after: 0, delay }, target: { kind: 'point', at: [150, 40] } },
+    ],
+  })
+
+  it('leaves the moment the pass lands, from where the receiver is', () => {
+    const { drill, problems } = compileFlow(base(), chain())
+    expect(problems).toEqual([])
+    const shot = drill.steps.flatMap((s) => s.moves).find((m) => m.style === 'shoot')!
+    expect(shot).toBeDefined()
+    expect(validateDrill(drill)).toEqual([])
+  })
+
+  it('can hold the puck for a moment first, while someone else is still skating', () => {
+    const longer = (delay?: number): Flow => {
+      const f = chain(delay)
+      f.paths.F1 = [{ kind: 'run', style: 'skate-puck', points: [[50, 20], [160, 20]] }] // F1 keeps going
+      return f
+    }
+    const shotStart = (f: Flow) => buildTimeline(compileFlow(base(), f).drill).plan.steps.find((s) => s.moves.some((m) => m.style === 'shoot'))!.start
+    expect(shotStart(longer(0.4)) - shotStart(longer())).toBeCloseTo(0.4, 1)
+  })
+
+  it('reports a hold in which nobody moves, since that cannot be a step', () => {
+    const f = chain(0.4)
+    // The pass lands at the very end of F2's run, when F1 has finished too: then the hold is dead time.
+    f.events[0].target = { kind: 'marker', marker: { actor: 'F2', piece: 0, at: 71.5 } }
+    expect(compileFlow(base(), f).problems.map((p) => p.code)).toContain('nobody-moves')
+  })
+
+  it('reports a chain that points at nothing', () => {
+    const f = chain()
+    f.events[1].from = { after: 7 }
+    expect(compileFlow(base(), f).problems.map((p) => p.code)).toContain('bad-chain')
+  })
+
+  it('reports a chain after a pass that nobody receives', () => {
+    const f = chain()
+    f.events[0].target = { kind: 'point', at: [100, 30] }
+    expect(compileFlow(base(), f).problems.map((p) => p.code)).toContain('bad-chain')
+  })
+})
+
 describe('phases name the steps', () => {
   const flow = (): Flow => ({
     paths: {

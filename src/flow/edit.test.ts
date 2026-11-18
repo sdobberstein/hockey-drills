@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { findWaits } from '../editor/waiting'
 import { stopAndWait } from '../engine/fixtures'
+import { buildTimeline } from '../engine/timeline'
 import { validateDrill } from '../engine/validate'
 import { editViaFlow } from './apply'
-import { insertWait, moveLanding, moveRelease, removeWait, setRunSeconds, setWaitSeconds, type Starts } from './edit'
+import { carrierOf, insertWait, moveLanding, moveRelease, removeWait, setRunSeconds, setWaitSeconds, type Starts } from './edit'
 import { drillToFlow } from './import'
 import { segmentsFor } from './timeline'
 import type { Flow } from './types'
@@ -134,9 +135,9 @@ describe('moving a pass\'s ends', () => {
   })
 
   it('keeps a time past the end on the last piece', () => {
-    const f = moveRelease(flow(), starts, 0, 99)
-    expect(f.events[0].from.piece).toBe(0)
-    expect(f.events[0].from.at).toBeCloseTo(segmentsFor(flow().paths.F1, [0, 0])[0].length)
+    const from = moveRelease(flow(), starts, 0, 99).events[0].from
+    expect('piece' in from && from.piece).toBe(0)
+    expect('at' in from && from.at).toBeCloseTo(segmentsFor(flow().paths.F1, [0, 0])[0].length)
   })
 
   it('leaves a pass that lands on a spot alone', () => {
@@ -195,5 +196,38 @@ describe('editing the reported drill by way of its flow', () => {
 
   it('knows the flow it imported has F2 stopping in front of the pass', () => {
     expect(drillToFlow(stopAndWait)!.paths.F2.map((p) => p.kind)).toEqual(['run', 'wait', 'run', 'wait'])
+  })
+})
+
+describe('a shot taken as the puck arrives follows the pass that fed it', () => {
+  const duration = (d: typeof stopAndWait) => buildTimeline(d).duration
+  const flowOf = () => drillToFlow(stopAndWait)!
+
+  it('is imported as anchored to the pass, not to a spot on F2\'s path', () => {
+    expect(flowOf().events[1].from).toEqual({ after: 0 })
+  })
+
+  it('moves with the pass when the pass lands earlier, leaving no dead time', () => {
+    const result = editViaFlow(stopAndWait, (f, s) => moveLanding(f, s, 0, 3.2))!
+    expect(result.added).toEqual([])
+    expect(validateDrill(result.drill)).toEqual([])
+    // The whole drill got shorter by about as much as the landing moved.
+    expect(duration(result.drill)).toBeLessThan(duration(stopAndWait) - 0.2)
+  })
+
+  it('stays anchored to the pass when the pass leaves later', () => {
+    const result = editViaFlow(stopAndWait, (f, s) => moveRelease(f, s, 0, 2.7))!
+    expect(result.added.map((p) => p.code)).not.toContain('nobody-moves')
+  })
+
+  it('becomes anchored to a point on the path once you choose when it leaves', () => {
+    const f = moveRelease(flowOf(), { F1: [96.2, 80.9], F2: [96.2, 60.4] }, 1, 3.3)
+    expect(f.events[1].from).toMatchObject({ actor: 'F2' })
+  })
+
+  it('names who has the puck for an event taken on arrival', () => {
+    expect(carrierOf(flowOf(), 1)).toBe('F2')
+    expect(carrierOf(flowOf(), 0)).toBe('F1')
+    expect(carrierOf(flowOf(), 9)).toBeNull()
   })
 })

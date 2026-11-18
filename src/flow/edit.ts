@@ -1,6 +1,6 @@
 import type { Point } from '../engine/types'
 import { markerAtTime, endTime, segmentsFor, type Segment } from './timeline'
-import type { Flow, Marker, Piece, PuckEvent } from './types'
+import { isAfter, type Flow, type Marker, type Piece, type PuckEvent } from './types'
 
 /**
  * Editing a flow: pure functions that return a new flow, never changing the
@@ -35,7 +35,7 @@ function withPieces(flow: Flow, actor: string, pieces: Piece[]): Flow {
 function mapMarkers(flow: Flow, actor: string, change: (m: Marker) => Marker): Flow {
   const mapOne = (m: Marker): Marker => (m.actor === actor ? change(m) : m)
   const events = flow.events.map((e): PuckEvent => {
-    const next: PuckEvent = { ...e, from: mapOne(e.from) }
+    const next: PuckEvent = { ...e, from: isAfter(e.from) ? e.from : mapOne(e.from) }
     if (e.target.kind === 'marker') next.target = { ...e.target, marker: mapOne(e.target.marker) }
     return next
   })
@@ -110,11 +110,30 @@ export function setRunSeconds(flow: Flow, starts: Starts, actor: string, index: 
   return withPieces(flow, actor, list.map((p, i) => (i === index ? { ...piece, speed } : p)))
 }
 
-/** Move where on the passer's path a pass leaves, to the point they reach at time `t`. */
-export function moveRelease(flow: Flow, starts: Starts, event: number, t: number): Flow {
+/**
+ * Who has the puck when this event happens: the skater whose path it leaves
+ * from, or for a release taken as the puck arrives, whoever the pass before it
+ * landed on.
+ */
+export function carrierOf(flow: Flow, event: number): string | null {
   const e = flow.events[event]
-  const segments = segmentsFor(flow.paths[e?.from.actor] ?? [], starts[e?.from.actor])
-  const marker = e && markerAtTime(segments, e.from.actor, Math.min(Math.max(t, 0), endTime(segments)))
+  if (!e) return null
+  if (!isAfter(e.from)) return e.from.actor
+  const previous = flow.events[e.from.after]
+  if (!previous) return null
+  return previous.target.kind === 'marker' ? previous.target.marker.actor : (previous.target.receiver ?? null)
+}
+
+/**
+ * Move where on the passer's path a pass leaves, to the point they reach at time
+ * `t`. A release that was taken as the puck arrived becomes anchored to that
+ * point instead: you have chosen when it leaves.
+ */
+export function moveRelease(flow: Flow, starts: Starts, event: number, t: number): Flow {
+  const actor = carrierOf(flow, event)
+  if (!actor) return flow
+  const segments = segmentsFor(flow.paths[actor] ?? [], starts[actor])
+  const marker = markerAtTime(segments, actor, Math.min(Math.max(t, 0), endTime(segments)))
   if (!marker) return flow
   return { ...flow, events: flow.events.map((x, i) => (i === event ? { ...x, from: marker } : x)) }
 }

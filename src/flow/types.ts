@@ -43,11 +43,26 @@ export type EventTarget =
   /** At a spot on the ice. The speed is given (or the style's default). */
   | { kind: 'point'; at: Point; receiver?: string; via?: Point[] }
 
+/**
+ * A release taken as the puck arrives: it leaves the moment the previous pass
+ * lands on the carrier, after an optional hold. This is how a shot or a
+ * one-touch pass is anchored, so that moving the pass that fed it moves the
+ * shot with it, instead of leaving it behind in the air.
+ */
+export interface After {
+  /** The index of the event whose landing this one follows. */
+  after: number
+  /** Seconds the carrier holds it before releasing. */
+  delay?: number
+}
+
+export const isAfter = (from: Marker | After): from is After => 'after' in from
+
 export interface PuckEvent {
   puck: string
   style: MoveStyle
-  /** Where on the carrier's path the puck leaves. */
-  from: Marker
+  /** When and where the puck leaves: a point on the carrier's path, or the instant the previous pass lands. */
+  from: Marker | After
   target: EventTarget
   /** Feet per second; used for a spot target, ignored when the speed is solved. */
   speed?: number

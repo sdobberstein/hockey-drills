@@ -4,8 +4,8 @@ import type { Drill, Move, Point, Step } from '../engine/types'
 import { validateDrill } from '../engine/validate'
 import { MAX_PASS_SPEED, MIN_PASS_SPEED } from '../editor/releases'
 import { cutPolyline } from './geometry'
-import { markerPoint, markerTime, segmentsFor, type Segment } from './timeline'
-import type { Flow, PuckEvent, RunPiece } from './types'
+import { markerPoint, markerTime, positionAtTime, segmentsFor, type Segment } from './timeline'
+import { isAfter, type Flow, type PuckEvent, type RunPiece } from './types'
 
 export interface FlowProblem {
   code:
@@ -14,6 +14,7 @@ export interface FlowProblem {
     | 'pass-in-flight'
     | 'nobody-moves'
     | 'unknown-actor'
+    | 'bad-chain'
     | 'drill-invalid'
   message: string
   /** Seconds into the drill, when the problem has a moment. */
@@ -32,6 +33,8 @@ const round1 = (n: number) => Math.round(n * 10) / 10
 const copy = (p: Point): Point => [p[0], p[1]]
 
 interface Resolved {
+  /** Who has the puck when it leaves. */
+  carrier: string
   event: PuckEvent
   /** When the puck leaves, and where from. */
   tRel: number
@@ -62,15 +65,40 @@ export function compileFlow(drill: Drill, flow: Flow): Compiled {
   }
 
   // --- resolve each release: when it leaves, where it goes, how fast -------
+  // In order, because a release taken as the puck arrives depends on the landing before it.
   const resolved: Resolved[] = []
-  for (const event of flow.events) {
-    const carrier = segs.get(event.from.actor)
-    if (!carrier) {
-      problems.push({ code: 'unknown-actor', message: `A ${event.style} leaves from "${event.from.actor}", who is not in the drill.` })
-      continue
+  const byIndex: (Resolved | undefined)[] = []
+  const add = (index: number, r: Resolved) => {
+    resolved.push(r)
+    byIndex[index] = r
+  }
+  flow.events.forEach((event, index) => {
+    // When and where it leaves, and who is carrying it.
+    let carrierActor: string
+    let tRel: number
+    let rel: Point
+    if (isAfter(event.from)) {
+      const previous = byIndex[event.from.after]
+      if (!previous?.receiver || !segs.has(previous.receiver)) {
+        problems.push({
+          code: 'bad-chain',
+          message: `A ${event.style} is meant to leave as the pass before it arrives, but that pass has no receiver or could not be placed.`,
+        })
+        return
+      }
+      carrierActor = previous.receiver
+      tRel = previous.tLand + (event.from.delay ?? 0)
+      rel = positionAtTime(segs.get(carrierActor)!, starts.get(carrierActor)!, tRel)
+    } else {
+      const carrier = segs.get(event.from.actor)
+      if (!carrier) {
+        problems.push({ code: 'unknown-actor', message: `A ${event.style} leaves from "${event.from.actor}", who is not in the drill.` })
+        return
+      }
+      carrierActor = event.from.actor
+      tRel = markerTime(carrier, event.from)
+      rel = markerPoint(carrier, event.from, starts.get(carrierActor)!)
     }
-    const tRel = markerTime(carrier, event.from)
-    const rel = markerPoint(carrier, event.from, starts.get(event.from.actor)!)
     const via = event.target.via ?? []
 
     if (event.target.kind === 'marker') {
@@ -78,7 +106,7 @@ export function compileFlow(drill: Drill, flow: Flow): Compiled {
       const receiver = segs.get(marker.actor)
       if (!receiver) {
         problems.push({ code: 'unknown-actor', message: `A ${event.style} lands on "${marker.actor}", who is not in the drill.` })
-        continue
+        return
       }
       const tLand = markerTime(receiver, marker)
       const route = [rel, ...via.map(copy), markerPoint(receiver, marker, starts.get(marker.actor)!)]
@@ -87,27 +115,27 @@ export function compileFlow(drill: Drill, flow: Flow): Compiled {
         problems.push({
           code: 'receiver-before-release',
           time: tRel,
-          message: `The ${event.style} leaves ${event.from.actor} at ${tRel.toFixed(2)} s, but ${marker.actor} reaches the landing point at ${tLand.toFixed(2)} s. Land it later on ${marker.actor}'s path.`,
+          message: `The ${event.style} leaves ${carrierActor} at ${tRel.toFixed(2)} s, but ${marker.actor} reaches the landing point at ${tLand.toFixed(2)} s. Land it later on ${marker.actor}'s path.`,
         })
         const speed = DEFAULT_SPEEDS[event.style]
-        resolved.push({ event, tRel, tLand: tRel + length / speed, route, speed, receiver: marker.actor })
-        continue
+        add(index, { carrier: carrierActor, event, tRel, tLand: tRel + length / speed, route, speed, receiver: marker.actor })
+        return
       }
       const speed = Math.max(round1(length / (tLand - tRel)), 0.1)
       if (speed < MIN_PASS_SPEED || speed > MAX_PASS_SPEED) {
         problems.push({
           code: 'pass-speed',
           time: tRel,
-          message: `Getting the ${event.style} from ${event.from.actor} to ${marker.actor} in ${(tLand - tRel).toFixed(2)} s needs ${speed} ft/s. Move the landing point to make it believable.`,
+          message: `Getting the ${event.style} from ${carrierActor} to ${marker.actor} in ${(tLand - tRel).toFixed(2)} s needs ${speed} ft/s. Move the landing point to make it believable.`,
         })
       }
-      resolved.push({ event, tRel, tLand, route, speed, receiver: marker.actor })
+      add(index, { carrier: carrierActor, event, tRel, tLand, route, speed, receiver: marker.actor })
     } else {
       const route = [rel, ...via.map(copy), copy(event.target.at)]
       const speed = event.speed ?? DEFAULT_SPEEDS[event.style]
-      resolved.push({ event, tRel, tLand: tRel + pathLength(route) / speed, route, speed, receiver: event.target.receiver })
+      add(index, { carrier: carrierActor, event, tRel, tLand: tRel + pathLength(route) / speed, route, speed, receiver: event.target.receiver })
     }
-  }
+  })
 
   // --- step boundaries ---------------------------------------------------------
   // Each boundary notes whether something *starts* there (a run, or a release),
@@ -152,7 +180,7 @@ export function compileFlow(drill: Drill, flow: Flow): Compiled {
         problems.push({
           code: 'pass-in-flight',
           time: m.t,
-          message: `Something starts at ${m.t.toFixed(2)} s while the ${r.event.style} from ${r.event.from.actor} is in the air (${r.tRel.toFixed(2)} to ${r.tLand.toFixed(2)} s), which steps cannot represent. Move it until after the ${r.event.style} lands.`,
+          message: `Something starts at ${m.t.toFixed(2)} s while the ${r.event.style} from ${r.carrier} is in the air (${r.tRel.toFixed(2)} to ${r.tLand.toFixed(2)} s), which steps cannot represent. Move it until after the ${r.event.style} lands.`,
         })
       } else dropped.add(m.t)
     }

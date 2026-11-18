@@ -2,7 +2,7 @@ import { distance } from '../engine/geometry'
 import { planDrill } from '../engine/plan'
 import type { Drill, Point } from '../engine/types'
 import { endTime, markerAtTime, segmentsFor, TIME_EPS } from './timeline'
-import type { EventTarget, Flow, Marker, Phase, Piece, PuckEvent, RunPiece } from './types'
+import type { After, EventTarget, Flow, Marker, Phase, Piece, PuckEvent, RunPiece } from './types'
 
 const copy = (p: Point): Point => [p[0], p[1]]
 
@@ -61,6 +61,8 @@ export function drillToFlow(drill: Drill): Flow | null {
 
   // 3. The puck's releases, in the order they happen.
   const events: PuckEvent[] = []
+  // When each puck last landed on someone, to spot a release taken as it arrives.
+  const lastLanding = new Map<string, { index: number; time: number; receiver: string }>()
   let broken = false
   plan.steps.forEach((step, si) => {
     step.moves.forEach((planned, mi) => {
@@ -71,7 +73,9 @@ export function drillToFlow(drill: Drill): Flow | null {
         broken = true
         return
       }
-      const from = markerFor(carrier, step.start)
+      const landed = lastLanding.get(planned.actor)
+      const takenOnArrival = landed && landed.receiver === carrier && Math.abs(step.start - landed.time) <= 0.005
+      const from: Marker | After = takenOnArrival ? { after: landed.index } : markerFor(carrier, step.start)
       const via = raw.points && raw.points.length > 2 ? raw.points.slice(1, -1).map(copy) : undefined
 
       let target: EventTarget
@@ -85,6 +89,9 @@ export function drillToFlow(drill: Drill): Flow | null {
       const event: PuckEvent = { puck: planned.actor, style: planned.style, from, target }
       if (raw.speed !== undefined && target.kind === 'point') event.speed = raw.speed
       events.push(event)
+      if (planned.receiver) {
+        lastLanding.set(planned.actor, { index: events.length - 1, time: step.start + planned.duration, receiver: planned.receiver })
+      } else lastLanding.delete(planned.actor)
     })
   })
   // 4. The names and notes a coach gave the steps, kept as phases.
