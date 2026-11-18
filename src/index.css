@@ -607,3 +607,17 @@ button.active .muted {
   cursor: ew-resize;
   z-index: 2;
 }
+
+.modes {
+  display: inline-flex;
+  margin-right: 8px;
+}
+
+.modes button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.modes button:last-child {
+  border-radius: 0 6px 6px 0;
+  margin-left: -1px;
+}

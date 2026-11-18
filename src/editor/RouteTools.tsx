@@ -20,6 +20,10 @@ interface Props {
   armed: MoveStyle | null
   drawing: boolean
   onArm: (style: MoveStyle | null) => void
+  /** Show the pass and shot tools. The flow view has no passes to draw yet. */
+  releases?: boolean
+  /** Describe the second click: in the flow view a run is added to the end of a skater's path. */
+  flow?: boolean
 }
 
 function StyleButtons({ styles, armed, onArm }: { styles: readonly MoveStyle[]; armed: MoveStyle | null; onArm: Props['onArm'] }) {
@@ -44,7 +48,7 @@ function StyleButtons({ styles, armed, onArm }: { styles: readonly MoveStyle[]; 
 }
 
 /** Choose a line style, then click an actor and click out its route. */
-export function RouteTools({ armed, drawing, onArm }: Props) {
+export function RouteTools({ armed, drawing, onArm, releases = true, flow = false }: Props) {
   const releasing = armed !== null && RELEASE_STYLES.includes(armed)
   return (
     <>
@@ -52,21 +56,33 @@ export function RouteTools({ armed, drawing, onArm }: Props) {
         <h3>Draw a route</h3>
         <StyleButtons styles={ROUTE_STYLES} armed={armed} onArm={onArm} />
       </section>
-      <section>
-        <h3>Pass or shoot</h3>
-        <StyleButtons styles={RELEASE_STYLES} armed={armed} onArm={onArm} />
+      {releases ? (
+        <section>
+          <h3>Pass or shoot</h3>
+          <StyleButtons styles={RELEASE_STYLES} armed={armed} onArm={onArm} />
+          <p className="hint">
+            {drawing
+              ? releasing
+                ? 'Click where it goes, or click a teammate. Click several points to bank it off the boards, then double-click.'
+                : 'Click to add points. Double-click or press Enter to finish. Esc cancels.'
+              : armed
+                ? releasing
+                  ? 'Now click the player with the puck.'
+                  : 'Now click the player to start from.'
+                : 'Pick a style, then click the player.'}
+          </p>
+        </section>
+      ) : (
         <p className="hint">
           {drawing
-            ? releasing
-              ? 'Click where it goes, or click a teammate. Click several points to bank it off the boards, then double-click.'
-              : 'Click to add points. Double-click or press Enter to finish. Esc cancels.'
+            ? 'Click to add points. Double-click or press Enter to finish. Esc cancels.'
             : armed
-              ? releasing
-                ? 'Now click the player with the puck.'
+              ? flow
+                ? 'Now click the skater. The run is added to the end of their path.'
                 : 'Now click the player to start from.'
-              : 'Pick a style, then click the player.'}
+              : 'Pick a style, then click a skater.'}
         </p>
-      </section>
+      )}
     </>
   )
 }

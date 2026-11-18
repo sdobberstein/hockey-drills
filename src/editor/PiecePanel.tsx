@@ -1,6 +1,9 @@
 import { useMemo } from 'react'
 import type { Drill } from '../engine/types'
 import { insertWait, removeWait, RUN_SPEED_LIMITS, setRunSeconds, setWaitSeconds, type Starts } from '../flow/edit'
+import { removeRun, setRunLook } from '../flow/pathEdit'
+import type { MoveStyle } from '../engine/types'
+import { ROUTE_STYLES } from './routes'
 import { drillToFlow } from '../flow/import'
 import { segmentsFor } from '../flow/timeline'
 import type { Flow } from '../flow/types'
@@ -71,9 +74,31 @@ export function PiecePanel({ drill, actor, piece, onEdit }: Props) {
         {seg.length.toFixed(1)} ft at {seg.speed.toFixed(1)} ft/s. A different time changes the speed (between {RUN_SPEED_LIMITS.minRunSpeed} and{' '}
         {RUN_SPEED_LIMITS.maxRunSpeed} ft/s), not where they go.
       </p>
+      <label className="field">
+        <span>Style</span>
+        <select value={seg.piece.style} onChange={(e) => onEdit((f, s) => setRunLook(f, s, actor, piece, { style: e.target.value as MoveStyle }))}>
+          {ROUTE_STYLES.map((style) => (
+            <option key={style} value={style}>
+              {style}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={seg.piece.smooth === true}
+          onChange={(e) => onEdit((f, s) => setRunLook(f, s, actor, piece, { smooth: e.target.checked }))}
+        />
+        Smooth the corners into a curve
+      </label>
       <button type="button" onClick={() => onEdit((f) => insertWait(f, actor, piece, 0.5))}>
         Pause before this run (0.5 s)
       </button>
+      <button type="button" className="danger" onClick={() => onEdit((f, s) => removeRun(f, s, actor, piece))}>
+        Delete this run
+      </button>
+      <p className="hint">Drag a dot on the ice to reshape. Drag a ring to add a point. Double-click a dot to remove it.</p>
     </section>
   )
 }

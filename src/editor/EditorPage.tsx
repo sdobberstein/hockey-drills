@@ -7,6 +7,8 @@ import { initialState, planDrill } from '../engine/plan'
 import type { ActorType, Drill, MoveStyle, Point } from '../engine/types'
 import { editViaFlow } from '../flow/apply'
 import { moveLanding, moveRelease, removeWait, setRunSeconds, setWaitSeconds, type Starts } from '../flow/edit'
+import { drillToFlow } from '../flow/import'
+import { appendRun, pathEnd, removeRun, setRunPoints } from '../flow/pathEdit'
 import { segmentsFor } from '../flow/timeline'
 import type { Flow } from '../flow/types'
 import { Timeline, type DragPhase } from '../flow/TimelineView'
@@ -17,6 +19,7 @@ import { PiecePanel } from './PiecePanel'
 import { deleteDraft, loadDraft } from './drafts'
 import { DetailsPanel } from './DetailsPanel'
 import { EditStage } from './EditStage'
+import { FlowStage, type StagePhase, type VertexGrab } from './FlowStage'
 import { addActor, deleteActor, moveActor } from './ops'
 import { clampToRink } from './rink'
 import { addRelease, applySuggestion, deleteMove, findMove, RELEASE_STYLES, reshapeRoute, setLanding, tieToRunEnd } from './releases'
@@ -56,6 +59,8 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
   const [drawing, setDrawing] = useState<Drawing | null>(null)
   const [message, setMessage] = useState('')
   const [previewing, setPreviewing] = useState(false)
+  // Two ways to work on the same drill: step by step, or as one path per skater.
+  const [mode, setMode] = useState<'steps' | 'flow'>('steps')
   // The drill as it was when a timeline drag began: every step of the drag is
   // worked out from it, so the result depends only on where the pointer is now.
   const dragBase = useRef<Drill | null>(null)
@@ -70,6 +75,13 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
       return null // a drill that cannot be planned still shows its actors
     }
   }, [drill])
+  const flow = useMemo(() => drillToFlow(drill), [drill])
+  const starts = useMemo<Starts>(() => Object.fromEntries(drill.actors.map((a) => [a.id, a.start])), [drill])
+  // Passes and shots, shown faint under the paths in the flow view.
+  const flights = useMemo(
+    () => (plan?.steps ?? []).flatMap((s) => s.moves.filter((m) => m.releases).map((m) => ({ style: m.style, path: m.path }))),
+    [plan],
+  )
   const positions = useMemo(() => {
     const at = step !== null && plan?.steps[step] ? plan.steps[step].before.positions : initialState(drill).positions
     return Object.fromEntries(at)
@@ -89,6 +101,14 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
   }
   const goTo = (next: number | null) => {
     setView(next)
+    setSelection(null)
+    setMessage('')
+    stopDrawing()
+    setArmed(null)
+  }
+
+  const switchMode = (next: 'steps' | 'flow') => {
+    setMode(next)
     setSelection(null)
     setMessage('')
     stopDrawing()
@@ -124,8 +144,9 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
   const finish = () => {
     if (!drawing) return
     const points = finishDrawing(drawing)
-    if (points) commitDrawing(points)
-    else stopDrawing()
+    if (!points) stopDrawing()
+    else if (mode === 'flow') commitFlowRun(points)
+    else commitDrawing(points)
   }
 
   /**
@@ -134,24 +155,51 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
    * would break something (a receiver arriving before the pass leaves, a run
    * starting while a pass is in the air) is refused with the reason.
    */
-  const flowEdit = (edit: (flow: Flow, starts: Starts) => Flow | null, phase: DragPhase | 'once' = 'once') => {
+  const flowEdit = (edit: (flow: Flow, starts: Starts) => Flow | null, phase: DragPhase | 'once' = 'once'): Drill | null => {
     const base = phase === 'move' ? dragBase.current : drill
-    if (!base) return
+    if (!base) return null
     const result = editViaFlow(base, edit)
     if (!result) {
       setMessage('That change is not possible here: it would need a speed nobody skates, or something that is not on the timeline.')
-      return
+      return null
     }
     if (result.added.length > 0) {
       // The most specific reason first: "the receiver arrives before the pass leaves"
       // says more than the validator's resulting complaint about the puck.
       const reason = result.added.find((p) => p.code !== 'drill-invalid') ?? result.added[0]
       setMessage(reason.message)
-      return
+      return null
     }
     setMessage('')
     if (phase === 'move') editor.preview(result.drill)
     else editor.edit(result.drill)
+    return result.drill
+  }
+
+  /** Add a run to the end of a skater's path, then select it. */
+  const commitFlowRun = (points: readonly Point[]) => {
+    if (!drawing || routeStyle === null) return
+    const { actor } = drawing
+    stopDrawing()
+    const next = flowEdit((f, s) => appendRun(f, s, actor, routeStyle, points))
+    if (!next) return
+    const pieces = drillToFlow(next)?.paths[actor] ?? []
+    const last = pieces.map((p) => p.kind).lastIndexOf('run')
+    if (last >= 0) setSelection({ kind: 'piece', actor, piece: last })
+  }
+
+  /** A drag of a point on a run in the flow view. A new point is inserted first, then dragged. */
+  const stageVertex = (g: VertexGrab, to: Point, phase: StagePhase) => {
+    const edit = (f: Flow, s: Starts) => {
+      const piece = f.paths[g.actor]?.[g.piece]
+      if (piece?.kind !== 'run') return null
+      let pts: readonly Point[] = piece.points
+      if (g.insertAfter !== undefined && g.insertAt) pts = insertPoint(pts, g.insertAfter, g.insertAt)
+      return setRunPoints(f, s, g.actor, g.piece, movePoint(pts, g.index, clampToRink(to)))
+    }
+    timelineDrag(phase, edit)
+    // A new point appears as soon as you grab the ring, not only once you move.
+    if (phase === 'start' && g.insertAfter !== undefined) timelineDrag('move', edit)
   }
 
   const timelineDrag = (phase: DragPhase, edit: (flow: Flow, starts: Starts) => Flow | null) => {
@@ -192,7 +240,8 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
           setSelection(null)
         } else if (selection?.kind === 'piece') {
           e.preventDefault()
-          flowEdit((f, s) => removeWait(f, s, selection.actor, selection.piece))
+          const kind = flow?.paths[selection.actor]?.[selection.piece]?.kind
+          flowEdit((f, s) => (kind === 'run' ? removeRun(f, s, selection.actor, selection.piece) : removeWait(f, s, selection.actor, selection.piece)))
         }
       } else if (selectedActor && step === null && e.key.startsWith('Arrow')) {
         e.preventDefault()
@@ -232,6 +281,14 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
       </nav>
 
       <div className="toolbar" role="toolbar" aria-label="Editor">
+        <span className="modes" role="group" aria-label="View">
+          <button type="button" aria-pressed={mode === 'steps'} className={mode === 'steps' ? 'active' : undefined} onClick={() => switchMode('steps')}>
+            Steps view
+          </button>
+          <button type="button" aria-pressed={mode === 'flow'} className={mode === 'flow' ? 'active' : undefined} onClick={() => switchMode('flow')}>
+            Flow view
+          </button>
+        </span>
         <button type="button" onClick={editor.undo} disabled={!editor.canUndo}>
           Undo
         </button>
@@ -268,6 +325,50 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
       ) : (
         <div className="editor">
           <div className="stage-col">
+          {mode === 'flow' && flow ? (
+            <FlowStage
+              drill={drill}
+              flow={flow}
+              starts={starts}
+              flights={flights}
+              selection={selection}
+              armed={armed}
+              routeTool={routeStyle !== null}
+              drawing={drawing}
+              onSelect={(next) => {
+                setSelection(next)
+                setMessage('')
+                if (next?.kind === 'piece') stopDrawing()
+              }}
+              onPlace={(at) => {
+                if (!armed) return
+                const { drill: next, id } = addActor(drill, armed, at)
+                editor.edit(next)
+                setSelection({ kind: 'actor', id })
+                setArmed(null)
+              }}
+              onActorDrag={(id, to) => editor.preview(moveActor(drill, id, to))}
+              onActorDragEnd={editor.endGesture}
+              onRunStart={(actor) => {
+                const who = drill.actors.find((a) => a.id === actor)
+                if (who?.type === 'puck' || who?.carriedBy) setMessage('Runs are for skaters. A puck moves with whoever carries it, or by a pass.')
+                else {
+                  setMessage('')
+                  setSelection(null)
+                  setDrawing({ actor, points: [pathEnd(flow, starts, actor)] })
+                }
+              }}
+              onDrawPoint={(at) => setDrawing((d) => (d ? { ...d, points: [...d.points, clampToRink(at)] } : d))}
+              onFinishDrawing={finish}
+              onVertex={stageVertex}
+              onVertexRemove={(actor, piece, index) =>
+                flowEdit((f, s) => {
+                  const run = f.paths[actor]?.[piece]
+                  return run?.kind === 'run' ? setRunPoints(f, s, actor, piece, removePoint(run.points, index)) : null
+                })
+              }
+            />
+          ) : (
           <EditStage
             drill={drill}
             step={step}
@@ -343,6 +444,7 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
             }}
             onVertexDragEnd={editor.endGesture}
           />
+          )}
             <Timeline
               drill={drill}
               editing={{
@@ -385,7 +487,9 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
             {selection?.kind === 'piece' && (
               <PiecePanel key={`${selection.actor}-${selection.piece}`} drill={drill} actor={selection.actor} piece={selection.piece} onEdit={(edit) => flowEdit(edit)} />
             )}
-            <SmoothnessPanel
+            {/* Stops here are hints about steps; in the flow view they are explicit waits on the timeline. */}
+            {mode === 'steps' && (
+              <SmoothnessPanel
               drill={drill}
               onEdit={editor.edit}
               onShow={(s, actor) => {
@@ -393,11 +497,31 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
                 setSelection({ kind: 'route', step: s, actor })
               }}
             />
-            <StepList drill={drill} planSteps={plan?.steps ?? []} view={step} onView={goTo} onEdit={editor.edit} />
-            {step === null ? (
-              <Palette armed={armed} onArm={setArmed} />
+            )}
+            {mode === 'flow' ? (
+              <>
+                <Palette armed={armed} onArm={setArmed} />
+                <RouteTools
+                  armed={routeStyle}
+                  drawing={drawing !== null}
+                  releases={false}
+                  flow
+                  onArm={(s) => {
+                    setRouteStyle(s)
+                    setDrawing(null)
+                    setMessage('')
+                  }}
+                />
+              </>
             ) : (
-              <RouteTools armed={routeStyle} drawing={drawing !== null} onArm={(s) => { setRouteStyle(s); setDrawing(null); setMessage('') }} />
+              <>
+                <StepList drill={drill} planSteps={plan?.steps ?? []} view={step} onView={goTo} onEdit={editor.edit} />
+                {step === null ? (
+                  <Palette armed={armed} onArm={setArmed} />
+                ) : (
+                  <RouteTools armed={routeStyle} drawing={drawing !== null} onArm={(s) => { setRouteStyle(s); setDrawing(null); setMessage('') }} />
+                )}
+              </>
             )}
             <DetailsPanel drill={drill} onEdit={editor.edit} />
           </aside>
