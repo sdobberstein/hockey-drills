@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "id": "cycle-give-and-go",
+  "title": "Cycle Give and Go",
+  "description": "F1 walks the boards with the puck and cycles it back to F2, then drives through the seam for a give and go. F1 one-touches to F3 for a one-timer. Adapted from the Cycle Give and Go drill on weisstechhockey.com.",
+  "tags": ["passing", "shooting", "cycle"],
+  "rink": "half-right",
+  "actors": [
+    { "id": "F1", "type": "forward", "label": "1", "start": [191, 78] },
+    { "id": "F2", "type": "forward", "label": "2", "start": [128, 78] },
+    { "id": "F3", "type": "forward", "label": "3", "start": [192, 10] },
+    { "id": "puck", "type": "puck", "start": [191, 78], "carriedBy": "F1" }
+  ],
+  "steps": [
+    {
+      "name": "Walk the boards",
+      "moves": [
+        { "actor": "F1", "style": "skate-puck", "points": [[191, 78], [172, 79]] },
+        { "actor": "F2", "style": "skate", "points": [[128, 78], [166, 79]] }
+      ]
+    },
+    {
+      "name": "Cycle pass",
+      "moves": [{ "actor": "puck", "style": "pass", "to": "F2" }]
+    },
+    {
+      "name": "Drive the seam",
+      "moves": [
+        { "actor": "F2", "style": "skate-puck", "points": [[166, 79], [158, 72], [155, 60], [157, 50]] },
+        { "actor": "F1", "style": "skate", "points": [[172, 79], [178, 72], [184, 66]] },
+        { "actor": "F3", "style": "skate", "points": [[192, 10], [188, 20], [179, 31]] }
+      ]
+    },
+    {
+      "name": "Give and go",
+      "moves": [{ "actor": "puck", "style": "pass", "to": "F1" }]
+    },
+    {
+      "name": "One-touch",
+      "moves": [{ "actor": "puck", "style": "pass", "to": "F3" }]
+    },
+    {
+      "name": "One-timer",
+      "moves": [{ "actor": "puck", "style": "shoot", "to": [189, 42.5] }]
+    }
+  ]
+}
