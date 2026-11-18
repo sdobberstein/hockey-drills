@@ -59,15 +59,48 @@ export function drillToFlow(drill: Drill): Flow | null {
     return markerAtTime(segmentsFor(list, startOf(actor)), actor, t)!
   }
 
-  // 3. The puck's releases, in the order they happen.
+  // 3. The puck's releases, in the order they happen. A flight that lasts several steps
+  //    is written as a release and then `continues` stretches; they are joined back into
+  //    one event here.
   const events: PuckEvent[] = []
   // When each puck last landed on someone, to spot a release taken as it arrives.
   const lastLanding = new Map<string, { index: number; time: number; receiver: string }>()
+  // A flight still in the air: the event it belongs to, the route so far, and the speed it was given.
+  const flying = new Map<string, { index: number; route: Point[]; speed?: number }>()
+
+  /** Set where a flight lands, from the route flown so far and how it ended. */
+  const land = (puck: string, planned: { receiver?: string; path: readonly Point[] }, endTime: number) => {
+    const flight = flying.get(puck)!
+    const event = events[flight.index]
+    const via = interior(flight.route)
+    let target: EventTarget
+    if (planned.receiver) target = { kind: 'marker', marker: markerFor(planned.receiver, endTime) }
+    else target = { kind: 'point', at: copy(flight.route[flight.route.length - 1]) }
+    if (via.length > 0) target.via = via
+    event.target = target
+    if (target.kind === 'point' && flight.speed !== undefined) event.speed = flight.speed
+    else delete event.speed
+    if (planned.receiver) lastLanding.set(puck, { index: flight.index, time: endTime, receiver: planned.receiver })
+    else lastLanding.delete(puck)
+  }
+
   let broken = false
   plan.steps.forEach((step, si) => {
     step.moves.forEach((planned, mi) => {
       if (!planned.releases) return
       const raw = drill.steps[si].moves[mi]
+
+      if (planned.continues) {
+        const flight = flying.get(planned.actor)
+        if (!flight) {
+          broken = true // a flight carrying on that never began
+          return
+        }
+        flight.route.push(...planned.path.slice(1).map(copy))
+        land(planned.actor, planned, step.start + planned.duration)
+        return
+      }
+
       const carrier = step.before.carriers.get(planned.actor)
       if (!carrier) {
         broken = true
@@ -76,22 +109,10 @@ export function drillToFlow(drill: Drill): Flow | null {
       const landed = lastLanding.get(planned.actor)
       const takenOnArrival = landed && landed.receiver === carrier && Math.abs(step.start - landed.time) <= 0.005
       const from: Marker | After = takenOnArrival ? { after: landed.index } : markerFor(carrier, step.start)
-      const via = raw.points && raw.points.length > 2 ? raw.points.slice(1, -1).map(copy) : undefined
-
-      let target: EventTarget
-      if (planned.receiver) {
-        target = { kind: 'marker', marker: markerFor(planned.receiver, step.start + planned.duration) }
-        if (via) target.via = via
-      } else {
-        target = { kind: 'point', at: copy(planned.path[planned.path.length - 1]) }
-        if (via) target.via = via
-      }
-      const event: PuckEvent = { puck: planned.actor, style: planned.style, from, target }
-      if (raw.speed !== undefined && target.kind === 'point') event.speed = raw.speed
-      events.push(event)
-      if (planned.receiver) {
-        lastLanding.set(planned.actor, { index: events.length - 1, time: step.start + planned.duration, receiver: planned.receiver })
-      } else lastLanding.delete(planned.actor)
+      // The target is provisional: a later `continues` stretch may carry the flight further.
+      events.push({ puck: planned.actor, style: planned.style, from, target: { kind: 'point', at: copy(planned.path[planned.path.length - 1]) } })
+      flying.set(planned.actor, { index: events.length - 1, route: planned.path.map(copy), speed: raw.speed })
+      land(planned.actor, planned, step.start + planned.duration)
     })
   })
   // 4. The names and notes a coach gave the steps, kept as phases.
@@ -136,4 +157,21 @@ function mergeRuns(pieces: Piece[]): Piece[] {
     }
   }
   return out
+}
+
+/**
+ * The bends in a route: its interior points, except those that lie on a straight
+ * line between their neighbours. A flight written across several steps has a
+ * point at each step boundary, which is not a bank, so it must not become one.
+ */
+function interior(route: readonly Point[]): Point[] {
+  const bends: Point[] = []
+  for (let i = 1; i < route.length - 1; i++) {
+    const [a, b, c] = [route[i - 1], route[i], route[i + 1]]
+    const length = distance(a, c)
+    // Distance of b from the line a-c.
+    const off = length === 0 ? distance(a, b) : Math.abs((c[0] - a[0]) * (a[1] - b[1]) - (a[0] - b[0]) * (c[1] - a[1])) / length
+    if (off > 1e-4) bends.push(copy(b))
+  }
+  return bends
 }

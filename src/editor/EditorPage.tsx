@@ -11,7 +11,7 @@ import { drillToFlow } from '../flow/import'
 import { appendRun, pathEnd, removeRun, setRunPoints } from '../flow/pathEdit'
 import { addPass, believable, endMarker, explain, followers, landingZones, locateOnPath, removePass, snapToLanding } from '../flow/passEdit'
 import { pointAlong } from '../engine/geometry'
-import { buildTimelineModel, carrierAtTime, puckCarriedBy } from '../flow/view'
+import { buildTimelineModel, carrierAtTime, mergedFlights, puckCarriedBy } from '../flow/view'
 import type { After, EventTarget, Marker } from '../flow/types'
 import { segmentsFor } from '../flow/timeline'
 import type { Flow } from '../flow/types'
@@ -86,10 +86,7 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
   const starts = useMemo<Starts>(() => Object.fromEntries(drill.actors.map((a) => [a.id, a.start])), [drill])
   // Passes and shots, shown faint under the paths in the flow view.
   const flights = useMemo(
-    () =>
-      (plan?.steps ?? [])
-        .flatMap((s) => s.moves.filter((m) => m.releases))
-        .map((m, index) => ({ index, style: m.style, path: m.path })),
+    () => (plan ? mergedFlights(plan).map((f, index) => ({ index, style: f.style, path: f.path })) : []),
     [plan],
   )
   const model = useMemo(() => buildTimelineModel(drill), [drill])

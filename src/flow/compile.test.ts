@@ -206,16 +206,23 @@ describe('problems are reported, not hidden', () => {
     expect(codes(f)).toContain('pass-speed')
   })
 
-  it('flags something starting while a pass is in the air', () => {
+  it('handles something starting while a pass is in the air, by writing the flight across steps', () => {
     const f = flow()
     // F2 changes style in the middle of the flight, which needs a step of its own.
     f.paths.F2 = [
-      { kind: 'run', style: 'skate', points: [[50, 60], [80, 55]] },
-      { kind: 'run', style: 'backward', points: [[80, 55], [120, 45]] },
+      { kind: 'run', style: 'skate', speed: 22.5, points: [[50, 60], [80, 55]] },
+      { kind: 'run', style: 'backward', speed: 22.5, points: [[80, 55], [120, 45]] },
     ]
     f.events[0].target = { kind: 'marker', marker: { actor: 'F2', piece: 1, at: 20 } }
     f.events[0].from = { actor: 'F1', piece: 0, at: 10 }
-    expect(codes(f)).toContain('pass-in-flight')
+    const { drill, problems } = compileFlow(base(), f)
+    expect(problems).toEqual([])
+    const puck = drill.steps.flatMap((s) => s.moves).filter((m) => m.actor === 'puck')
+    expect(puck.length).toBeGreaterThan(1) // in the air across more than one step
+    expect(puck[0].continues).toBeUndefined() // the release
+    expect(puck.slice(1).every((m) => m.continues === true)).toBe(true)
+    expect(puck.filter((m) => m.receiver).length).toBe(1) // received once, at the end
+    expect(validateDrill(drill)).toEqual([])
   })
 
   it('flags a pass from or to someone who is not in the drill', () => {

@@ -173,9 +173,12 @@ describe('editing the reported drill by way of its flow', () => {
     expect(passOf(result.drill).speed).toBeLessThan(44)
   })
 
-  it('refuses making F2 start running again while the pass is still in the air', () => {
+  it('lets F2 start running again while the pass is still in the air, by writing the flight across steps', () => {
     const result = editViaFlow(stopAndWait, (f, s) => setWaitSeconds(f, s, 'F2', 1, 0.4))!
-    expect(result.added.map((p) => p.code)).toContain('pass-in-flight')
+    expect(result.added).toEqual([])
+    expect(validateDrill(result.drill)).toEqual([])
+    const flight = result.drill.steps.flatMap((s) => s.moves).filter((m) => m.actor === 'puck' && m.style === 'pass')
+    expect(flight.length).toBeGreaterThan(1)
   })
 
   it('refuses landing the pass before it leaves', () => {

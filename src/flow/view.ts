@@ -1,5 +1,5 @@
-import { planDrill } from '../engine/plan'
-import type { ActorType, Drill, MoveStyle } from '../engine/types'
+import { planDrill, type Plan } from '../engine/plan'
+import type { ActorType, Drill, MoveStyle, Point } from '../engine/types'
 import { drillToFlow } from './import'
 import { segmentsFor } from './timeline'
 
@@ -72,6 +72,54 @@ export interface TimelineModel {
   steps: { start: number; name?: string }[]
 }
 
+/** A pass, shot or drop pass from release to landing, however many steps it was in the air for. */
+export interface Flight {
+  puck: string
+  style: MoveStyle
+  carrier: string
+  receiver?: string
+  t0: number
+  t1: number
+  /** The whole route, release to landing. */
+  path: Point[]
+}
+
+/**
+ * Every flight in a plan, with the stretches of a flight that lasts several
+ * steps (a release, then `continues` stretches) joined into one.
+ */
+export function mergedFlights(plan: Plan): Flight[] {
+  const out: Flight[] = []
+  const open = new Map<string, Flight>()
+  for (const step of plan.steps) {
+    for (const move of step.moves) {
+      if (!move.releases) continue
+      if (move.continues) {
+        const f = open.get(move.actor)
+        if (!f) continue
+        f.t1 = step.start + move.duration
+        f.receiver = move.receiver
+        f.path = [...f.path, ...move.path.slice(1)]
+        continue
+      }
+      const carrier = step.before.carriers.get(move.actor)
+      if (!carrier) continue
+      const f: Flight = {
+        puck: move.actor,
+        style: move.style,
+        carrier,
+        receiver: move.receiver,
+        t0: step.start,
+        t1: step.start + move.duration,
+        path: [...move.path],
+      }
+      out.push(f)
+      open.set(move.actor, f)
+    }
+  }
+  return out
+}
+
 export function buildTimelineModel(drill: Drill): TimelineModel | null {
   const flow = drillToFlow(drill)
   if (!flow) return null
@@ -83,15 +131,7 @@ export function buildTimelineModel(drill: Drill): TimelineModel | null {
   }
 
   // Events by when they happen, from the plan: exact, and the same times the engine plays.
-  const flights: { puck: string; style: MoveStyle; carrier: string; receiver?: string; t0: number; t1: number }[] = []
-  for (const step of plan.steps) {
-    for (const move of step.moves) {
-      const carrier = step.before.carriers.get(move.actor)
-      if (move.releases && carrier) {
-        flights.push({ puck: move.actor, style: move.style, carrier, receiver: move.receiver, t0: step.start, t1: step.start + move.duration })
-      }
-    }
-  }
+  const flights = mergedFlights(plan)
 
   const rows: TimelineRow[] = []
   for (const actor of drill.actors) {

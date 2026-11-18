@@ -210,9 +210,12 @@ describe('editing the reported drill\'s paths by way of its flow', () => {
     expect(Math.hypot(end[0] - 12, end[1] - 40)).toBeLessThan(0.5) // F2 finishes where the new run ends
   })
 
-  it('deleting F1\'s only run leaves F1 standing at its start, and says what that broke', () => {
+  it('deleting F1\'s only run leaves F1 standing at its start, and the pass now leaves from there', () => {
     const result = editViaFlow(stopAndWait, (f, s) => removeRun(f, s, 'F1', 0))!
-    expect(result.drill).toBeDefined()
-    expect(result.added.length).toBeGreaterThan(0) // the pass leaves from a path that is no longer there
+    expect(result.added).toEqual([])
+    const tl = buildTimeline(result.drill)
+    const at = tl.at(tl.duration / 2).F1
+    expect(Math.hypot(at[0] - 96.2, at[1] - 80.9)).toBeLessThan(0.01) // never moves
+    expect(validateDrill(result.drill)).toEqual([])
   })
 })

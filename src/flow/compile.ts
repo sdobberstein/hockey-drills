@@ -11,7 +11,6 @@ export interface FlowProblem {
   code:
     | 'receiver-before-release'
     | 'pass-speed'
-    | 'pass-in-flight'
     | 'nobody-moves'
     | 'unknown-actor'
     | 'bad-chain'
@@ -167,22 +166,15 @@ export function compileFlow(drill: Drill, flow: Flow): Compiled {
       return out
     }, [])
 
-  // A step holds a whole flight, so the pass spans every instant between its
-  // release and its landing. A skater whose run merely *ends* in that window
-  // just stands for the rest of the step, so that boundary can go. Something
-  // that *starts* in it (a new run, another release) would need a step of its
-  // own in the middle of the flight, which cannot be represented.
+  // A flight that is in the air while something starts is written as a chain: the
+  // release in the first step and a `continues` stretch in each step after, so a
+  // boundary where something starts is kept even inside a flight. A boundary where
+  // nothing starts (a skater merely finishes a run) can go: the flight spans it.
   const dropped = new Set<number>()
   for (const r of resolved) {
     for (const m of merged) {
       if (m.t <= r.tRel + MERGE || m.t >= r.tLand - MERGE) continue
-      if (m.starts) {
-        problems.push({
-          code: 'pass-in-flight',
-          time: m.t,
-          message: `Something starts at ${m.t.toFixed(2)} s while the ${r.event.style} from ${r.carrier} is in the air (${r.tRel.toFixed(2)} to ${r.tLand.toFixed(2)} s), which steps cannot represent. Move it until after the ${r.event.style} lands.`,
-        })
-      } else dropped.add(m.t)
+      if (!m.starts) dropped.add(m.t)
     }
   }
   const kept = merged.filter((m) => !dropped.has(m.t))
@@ -232,9 +224,10 @@ export function compileFlow(drill: Drill, flow: Flow): Compiled {
 
     let name: string | undefined
     for (const r of resolved) {
-      if (Math.abs(r.tRel - a) > MERGE) continue
-      moves.push(emitRelease(r))
-      name ??= r.event.name
+      const move = emitFlight(r, a, c)
+      if (!move) continue
+      moves.push(move)
+      if (Math.abs(r.tRel - a) <= MERGE) name ??= r.event.name
     }
     // A phase that starts here names the step (and wins over an event's own name).
     const phase = (flow.phases ?? []).find((p) => Math.abs(p.start - a) <= MERGE)
@@ -286,13 +279,35 @@ function emitRun(actor: string, seg: Segment, tA: number, tB: number): Move | nu
   return move
 }
 
-function emitRelease(r: Resolved): Move {
+/**
+ * The part of a pass or shot that is in the air during the step from `a` to `c`,
+ * or null if it is not. The release (the step it starts in) leaves the carrier;
+ * every later step it is still in the air gets a `continues` stretch from where the
+ * last one ended; `receiver` goes on the last. Where it fits in one step this is
+ * the whole flight, exactly as before.
+ *
+ * The flight is cut by arc length at the speed it is flying, so every stretch lasts
+ * exactly as long as its step.
+ */
+function emitFlight(r: Resolved, a: number, c: number): Move | null {
   const { event, route, speed, receiver } = r
+  const first = Math.abs(r.tRel - a) <= MERGE
+  const inAir = first || (r.tRel < a - MERGE && r.tLand > a + MERGE)
+  if (!inAir) return null
+
+  const last = r.tLand <= c + MERGE
+  const total = pathLength(route)
+  const s0 = first ? 0 : Math.min(Math.max((a - r.tRel) * speed, 0), total)
+  const s1 = last ? total : Math.min(Math.max((c - r.tRel) * speed, 0), total)
+  const points = first && last ? route.map(copy) : cutPolyline(route, s0, s1)
+  if (points.length < 2) return null
+
   const move: Move =
-    route.length > 2
-      ? { actor: event.puck, style: event.style, points: route.map(copy) }
-      : { actor: event.puck, style: event.style, to: copy(route[1]) }
+    points.length > 2
+      ? { actor: event.puck, style: event.style, points }
+      : { actor: event.puck, style: event.style, to: copy(points[1]) }
   if (Math.abs(speed - DEFAULT_SPEEDS[event.style]) >= 0.05) move.speed = speed
-  if (receiver !== undefined) move.receiver = receiver
+  if (last && receiver !== undefined) move.receiver = receiver
+  if (!first) move.continues = true
   return move
 }
