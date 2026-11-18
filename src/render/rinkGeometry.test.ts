@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { viewBoxFor } from './rinkGeometry'
+import { viewAspect, viewBoxFor } from './rinkGeometry'
 
 describe('viewBoxFor', () => {
   it('shows the whole rink with a margin', () => {
@@ -12,5 +12,12 @@ describe('viewBoxFor', () => {
     expect(viewBoxFor('half-left')).toBe('-3 -3 106 91')
     expect(viewBoxFor('half-top')).toBe('-3 -3 206 48.5')
     expect(viewBoxFor('half-bottom')).toBe('-3 39.5 206 48.5')
+  })
+})
+
+describe('viewAspect', () => {
+  it('is wide for the full rink and tall for a half rink', () => {
+    expect(viewAspect('full')).toBeCloseTo(206 / 91)
+    expect(viewAspect('half-right')).toBeCloseTo(106 / 91)
   })
 })

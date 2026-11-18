@@ -38,6 +38,7 @@ h1 {
 }
 
 .player svg {
+  max-width: 100%;
   display: block;
   border: 1px solid #d4d8de;
   border-radius: 8px;

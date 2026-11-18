@@ -5,7 +5,7 @@ import { ActorSymbol } from './ActorSymbol'
 import { displayPosition } from './layout'
 import { MoveLine } from './MoveLine'
 import { Rink } from './Rink'
-import { viewBoxFor } from './rinkGeometry'
+import { viewAspect, viewBoxFor } from './rinkGeometry'
 
 interface Props {
   drill: Drill
@@ -28,7 +28,20 @@ export function DrillView({ drill, plan, frame, activeStep }: Props) {
   const ordered = [...drill.actors].sort((a, b) => Number(a.type === 'puck') - Number(b.type === 'puck'))
 
   return (
-    <svg viewBox={viewBoxFor(drill.rink)} role="img" aria-label={drill.title} style={{ width: '100%', height: 'auto' }}>
+    <svg
+      viewBox={viewBoxFor(drill.rink)}
+      role="img"
+      aria-label={drill.title}
+      // Fill the page width, but never grow taller than 70% of the window.
+      // A half rink is nearly square, so at full width it would overflow the
+      // screen. aspect-ratio lets the height follow whichever width we pick.
+      style={{
+        aspectRatio: viewAspect(drill.rink),
+        width: `min(100%, calc(70vh * ${viewAspect(drill.rink)}))`,
+        height: 'auto',
+        margin: '0 auto',
+      }}
+    >
       <Rink />
       {plan.steps.map((step, si) =>
         step.moves.map((move, mi) => (

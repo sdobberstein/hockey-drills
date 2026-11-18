@@ -47,3 +47,9 @@ export function viewBoxFor(view: RinkView): string {
   if (view === 'half-bottom') y0 = centerY
   return `${x0 - MARGIN} ${y0 - MARGIN} ${x1 - x0 + 2 * MARGIN} ${y1 - y0 + 2 * MARGIN}`
 }
+
+/** Width divided by height of a view, for sizing the picture. */
+export function viewAspect(view: RinkView): number {
+  const [, , w, h] = viewBoxFor(view).split(' ').map(Number)
+  return w / h
+}
