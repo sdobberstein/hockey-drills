@@ -2,7 +2,7 @@ import { pathLength } from '../engine/geometry'
 import type { PlannedMove } from '../engine/plan'
 import type { Drill, MoveStyle } from '../engine/types'
 import { CommitField } from './CommitField'
-import { deleteMove, findMove, isRelease, RELEASE_STYLES, retimePass, updateRelease } from './releases'
+import { deleteMove, findMove, isRelease, RELEASE_STYLES, retimePass, tieToRunEnd, updateRelease } from './releases'
 import { ROUTE_STYLES, updateRoute } from './routes'
 
 interface Props {
@@ -89,9 +89,14 @@ export function RoutePanel({ drill, step, actor, planned, stepDuration, onEdit }
             </select>
           </label>
           {receiver && straight && (
-            <button type="button" onClick={() => onEdit(retimePass(drill, step, actor))}>
-              Land on {receiver} (keep speeds)
-            </button>
+            <div className="stack">
+              <button type="button" onClick={() => onEdit(tieToRunEnd(drill, step, actor))}>
+                Land at the end of {receiver}'s run
+              </button>
+              <button type="button" onClick={() => onEdit(retimePass(drill, step, actor))}>
+                Meet {receiver} along the run (keep pass speed)
+              </button>
+            </div>
           )}
           <p className="hint">
             {typeof move.to === 'string'
@@ -99,7 +104,7 @@ export function RoutePanel({ drill, step, actor, planned, stepDuration, onEdit }
               : move.points
                 ? 'A bank: drag the dots to shape it.'
                 : 'Drag the dot to move where it lands.'}
-            {' '}If the teammate is skating, “Land on” finds the spot where you meet.
+            {' '}“Land at the end” sets the pass speed so the puck arrives as they finish their run.
           </p>
         </>
       )}

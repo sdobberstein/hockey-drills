@@ -13,11 +13,12 @@ import { DetailsPanel } from './DetailsPanel'
 import { EditStage } from './EditStage'
 import { addActor, deleteActor, moveActor } from './ops'
 import { clampToRink } from './rink'
-import { addRelease, applySuggestion, deleteMove, findMove, RELEASE_STYLES, retimePass, setLanding } from './releases'
-import { addRoute, findRoute, insertPoint, movePoint, removePoint, setRoutePoints } from './routes'
+import { addRelease, applySuggestion, deleteMove, findMove, RELEASE_STYLES, reshapeRoute, setLanding, tieToRunEnd } from './releases'
+import { addRoute, findRoute, insertPoint, movePoint, removePoint } from './routes'
 import { RoutePanel } from './RoutePanel'
 import { RouteTools } from './RouteTools'
 import { finishDrawing, type Drawing, type Selection } from './selection'
+import { SmoothnessPanel } from './SmoothnessPanel'
 import { StepList } from './StepList'
 import { Palette } from './Palette'
 import { useEditor } from './useEditor'
@@ -92,8 +93,9 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
     let next = drill
     if (releaseTool) {
       if (receiver !== undefined && points.length === 2) {
-        // Aimed at a teammate: if they are skating, move the landing spot onto their route.
-        next = retimePass(addRelease(drill, step, drawing.actor, routeStyle, { kind: 'actor', id: receiver }), step, drawing.actor)
+        // Aimed at a teammate: if they are skating, land the pass where their run ends and set
+        // its speed so the puck arrives as they do, so there is nothing to work out by hand.
+        next = tieToRunEnd(addRelease(drill, step, drawing.actor, routeStyle, { kind: 'actor', id: receiver }), step, drawing.actor)
       } else if (points.length === 2) {
         next = addRelease(drill, step, drawing.actor, routeStyle, { kind: 'point', at: points[1] })
       } else {
@@ -168,11 +170,11 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
   // Reshape the selected route. A drag passes gesture=true so it previews as one undo step.
   const reshape = (change: (points: readonly Point[]) => readonly Point[], gesture: boolean) => {
     if (selection?.kind !== 'route' || !selectedRoute) return
-    const next = setRoutePoints(drill, selection.step, selection.actor, change(selectedRoute.points))
+    // reshapeRoute also moves any pass that was landing at the end of this run.
+    const next = reshapeRoute(drill, selection.step, selection.actor, change(selectedRoute.points))
     if (gesture) editor.preview(next)
     else editor.edit(next)
   }
-
 
   return (
     <div className="editor-page">
@@ -314,6 +316,14 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
                 onApply={(issue, choice) => editor.edit(applySuggestion(drill, issue.location, choice))}
               />
             )}
+            <SmoothnessPanel
+              drill={drill}
+              onEdit={editor.edit}
+              onShow={(s, actor) => {
+                goTo(s)
+                setSelection({ kind: 'route', step: s, actor })
+              }}
+            />
             <StepList drill={drill} planSteps={plan?.steps ?? []} view={step} onView={goTo} onEdit={editor.edit} />
             {step === null ? (
               <Palette armed={armed} onArm={setArmed} />
