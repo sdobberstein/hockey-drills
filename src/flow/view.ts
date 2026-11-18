@@ -145,3 +145,18 @@ export function buildTimelineModel(drill: Drill): TimelineModel | null {
   }
 }
 
+/**
+ * Who has a puck at a moment, or null if it is in the air or loose. Used to
+ * refuse "F2 passes" at a time F2 does not have the puck, and to say who does.
+ */
+export function carrierAtTime(model: TimelineModel, puck: string, t: number): string | null {
+  const row = model.pucks.find((p) => p.actor === puck)
+  const span = row?.spans.find((s) => t >= s.t0 - 1e-6 && t <= s.t1 + 1e-6 && s.carrier !== null)
+  return span?.carrier ?? null
+}
+
+/** The puck a skater is carrying at a moment, if any. */
+export function puckCarriedBy(model: TimelineModel, actor: string, t: number): string | null {
+  for (const row of model.pucks) if (carrierAtTime(model, row.actor, t) === actor) return row.actor
+  return null
+}
