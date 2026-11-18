@@ -2,6 +2,7 @@ import type { Frame } from '../engine/timeline'
 import type { Plan } from '../engine/plan'
 import type { Drill } from '../engine/types'
 import { ActorSymbol } from './ActorSymbol'
+import { displayPosition } from './layout'
 import { MoveLine } from './MoveLine'
 import { Rink } from './Rink'
 import { viewBoxFor } from './rinkGeometry'
@@ -40,7 +41,7 @@ export function DrillView({ drill, plan, frame, activeStep }: Props) {
         )),
       )}
       {ordered.map((actor) => {
-        const [x, y] = frame[actor.id] ?? actor.start
+        const [x, y] = displayPosition(actor, frame, drill.actors)
         return (
           <g key={actor.id} transform={`translate(${x} ${y})`}>
             <ActorSymbol actor={actor} />
