@@ -2,13 +2,13 @@
   "version": 1,
   "id": "cycle-give-and-go",
   "title": "Cycle Give and Go",
-  "description": "F1 walks the boards with the puck and cycles it back to F2, then drives through the seam for a give and go. F1 one-touches to F3 for a one-timer. Adapted from the Cycle Give and Go drill on weisstechhockey.com.",
+  "description": "F1 walks the puck along the boards toward F2 and bumps it back off the boards. F1 curves around the circle into the slot while F2 carries the puck around the lower, goal-side part of the circle. F2 passes to F1, who shoots. Adapted from the Cycle Give and Go drill on weisstechhockey.com.",
   "tags": ["passing", "shooting", "cycle"],
   "rink": "half-right",
+  "progression": { "series": "cycle-give-and-go", "order": 1 },
   "actors": [
     { "id": "F1", "type": "forward", "label": "1", "start": [191, 78] },
     { "id": "F2", "type": "forward", "label": "2", "start": [128, 78] },
-    { "id": "F3", "type": "forward", "label": "3", "start": [192, 10] },
     { "id": "puck", "type": "puck", "start": [191, 78], "carriedBy": "F1" }
   ],
   "steps": [
@@ -20,15 +20,15 @@
       ]
     },
     {
-      "name": "Cycle pass",
+      "name": "Bump pass",
       "moves": [{ "actor": "puck", "style": "pass", "to": "F2" }]
     },
     {
-      "name": "Drive the seam",
+      "name": "Around the circle",
+      "notes": "F1 curves around the outside of the circle into the slot. F2 carries the puck around the lower, goal-side part of the circle.",
       "moves": [
-        { "actor": "F2", "style": "skate-puck", "points": [[166, 79], [158, 72], [155, 60], [157, 50]] },
-        { "actor": "F1", "style": "skate", "points": [[172, 79], [178, 72], [184, 66]] },
-        { "actor": "F3", "style": "skate", "points": [[192, 10], [188, 20], [179, 31]] }
+        { "actor": "F1", "style": "skate", "points": [[172, 79], [160, 77], [154.5, 72.4], [148.8, 62], [149.4, 55], [157, 50]] },
+        { "actor": "F2", "style": "skate-puck", "speed": 12, "points": [[166, 79], [172, 79], [178, 73], [185, 66]] }
       ]
     },
     {
@@ -36,11 +36,7 @@
       "moves": [{ "actor": "puck", "style": "pass", "to": "F1" }]
     },
     {
-      "name": "One-touch",
-      "moves": [{ "actor": "puck", "style": "pass", "to": "F3" }]
-    },
-    {
-      "name": "One-timer",
+      "name": "Shot",
       "moves": [{ "actor": "puck", "style": "shoot", "to": [189, 42.5] }]
     }
   ]
