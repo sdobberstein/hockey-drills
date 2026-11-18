@@ -3,7 +3,8 @@ import { downloadDrill } from '../app/share'
 import { drillHash, libraryHash } from '../app/route'
 import { Issues } from '../app/Issues'
 import { parseDrill } from '../engine/parse'
-import type { ActorType, Drill } from '../engine/types'
+import { initialState, planDrill } from '../engine/plan'
+import type { ActorType, Drill, MoveStyle, Point } from '../engine/types'
 import { libraryDrills } from '../library/drills'
 import { Player } from '../player/Player'
 import { ActorPanel } from './ActorPanel'
@@ -11,6 +12,12 @@ import { deleteDraft, loadDraft } from './drafts'
 import { DetailsPanel } from './DetailsPanel'
 import { EditStage } from './EditStage'
 import { addActor, deleteActor, moveActor } from './ops'
+import { clampToRink } from './rink'
+import { addRoute, deleteRoute, findRoute, insertPoint, movePoint, removePoint, setRoutePoints } from './routes'
+import { RoutePanel } from './RoutePanel'
+import { RouteTools } from './RouteTools'
+import { finishDrawing, type Drawing, type Selection } from './selection'
+import { StepList } from './StepList'
 import { Palette } from './Palette'
 import { useEditor } from './useEditor'
 
@@ -33,15 +40,62 @@ export function EditorPage({ id }: { id: string }) {
 function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) {
   const editor = useEditor(initial)
   const { drill } = editor
-  const [selected, setSelected] = useState<string | null>(null)
+  // null is Setup (starting positions); a number is the step being edited.
+  const [view, setView] = useState<number | null>(null)
+  const [selection, setSelection] = useState<Selection>(null)
   const [armed, setArmed] = useState<ActorType | null>(null)
+  const [routeStyle, setRouteStyle] = useState<MoveStyle | null>(null)
+  const [drawing, setDrawing] = useState<Drawing | null>(null)
+  const [message, setMessage] = useState('')
   const [previewing, setPreviewing] = useState(false)
 
-  const selectedActor = drill.actors.find((a) => a.id === selected) ?? null
+  // Steps can be deleted from under the view; never point past the end.
+  const step = view === null || drill.steps.length === 0 ? null : Math.min(view, drill.steps.length - 1)
+
+  const plan = useMemo(() => {
+    try {
+      return planDrill(drill)
+    } catch {
+      return null // a drill that cannot be planned still shows its actors
+    }
+  }, [drill])
+  const positions = useMemo(() => {
+    const at = step !== null && plan?.steps[step] ? plan.steps[step].before.positions : initialState(drill).positions
+    return Object.fromEntries(at)
+  }, [drill, plan, step])
+
+  const selectedActor = selection?.kind === 'actor' ? (drill.actors.find((a) => a.id === selection.id) ?? null) : null
+  const selectedRoute = selection?.kind === 'route' ? findRoute(drill, selection.step, selection.actor) : undefined
   const result = useMemo(() => parseDrill(drill), [drill])
   const valid = result.drill !== null
 
-  // Keyboard: undo/redo, delete, nudge. Ignored while typing in a field.
+  const stopDrawing = () => {
+    setDrawing(null)
+    setRouteStyle(null)
+  }
+  const goTo = (next: number | null) => {
+    setView(next)
+    setSelection(null)
+    setMessage('')
+    stopDrawing()
+    setArmed(null)
+  }
+
+  const finish = () => {
+    if (!drawing || step === null || routeStyle === null) return
+    const points = finishDrawing(drawing)
+    stopDrawing()
+    if (!points) return
+    const next = addRoute(drill, step, drawing.actor, routeStyle, points)
+    if (next === drill) {
+      setMessage(`Could not add that route for ${drawing.actor}.`)
+      return
+    }
+    editor.edit(next)
+    setSelection({ kind: 'route', step, actor: drawing.actor })
+  }
+
+  // Keyboard: undo/redo, finish/cancel, delete, nudge. Ignored while typing in a field.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest('input, textarea, select')) return
@@ -54,13 +108,23 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
       } else if (mod && key === 'y') {
         e.preventDefault()
         editor.redo()
+      } else if (e.key === 'Enter' && drawing) {
+        e.preventDefault()
+        finish()
       } else if (e.key === 'Escape') {
         setArmed(null)
-      } else if (selectedActor && (e.key === 'Delete' || e.key === 'Backspace')) {
-        e.preventDefault()
-        editor.edit(deleteActor(drill, selectedActor.id))
-        setSelected(null)
-      } else if (selectedActor && e.key.startsWith('Arrow')) {
+        stopDrawing()
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedActor) {
+          e.preventDefault()
+          editor.edit(deleteActor(drill, selectedActor.id))
+          setSelection(null)
+        } else if (selection?.kind === 'route') {
+          e.preventDefault()
+          editor.edit(deleteRoute(drill, selection.step, selection.actor))
+          setSelection(null)
+        }
+      } else if (selectedActor && step === null && e.key.startsWith('Arrow')) {
         e.preventDefault()
         const amount = e.shiftKey ? 5 : 1
         const dx = e.key === 'ArrowRight' ? amount : e.key === 'ArrowLeft' ? -amount : 0
@@ -71,13 +135,22 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [drill, selectedActor, editor])
+  })
 
   const discard = () => {
     if (!window.confirm('Discard this draft? Your changes will be lost.')) return
     deleteDraft(drill.id)
     window.location.hash = inLibrary ? drillHash(drill.id) : libraryHash()
   }
+
+  // Reshape the selected route. A drag passes gesture=true so it previews as one undo step.
+  const reshape = (change: (points: readonly Point[]) => readonly Point[], gesture: boolean) => {
+    if (selection?.kind !== 'route' || !selectedRoute) return
+    const next = setRoutePoints(drill, selection.step, selection.actor, change(selectedRoute.points))
+    if (gesture) editor.preview(next)
+    else editor.edit(next)
+  }
+
 
   return (
     <div className="editor-page">
@@ -114,6 +187,11 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
           {editor.status === 'failed' && 'Could not save a draft (browser storage is unavailable)'}
         </span>
       </div>
+      {message && (
+        <p className="notice" role="status">
+          {message}
+        </p>
+      )}
 
       {previewing && result.drill ? (
         <Player drill={result.drill} />
@@ -121,30 +199,68 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
         <div className="editor">
           <EditStage
             drill={drill}
-            selected={selected}
+            step={step}
+            positions={positions}
+            planSteps={plan?.steps ?? []}
+            selection={selection}
             armed={armed}
-            onSelect={setSelected}
+            routeTool={routeStyle !== null}
+            drawing={drawing}
+            onSelect={(next) => {
+              setSelection(next)
+              setMessage('')
+            }}
             onPlace={(at) => {
               if (!armed) return
               const { drill: next, id } = addActor(drill, armed, at)
               editor.edit(next)
-              setSelected(id)
+              setSelection({ kind: 'actor', id })
               setArmed(null)
             }}
-            onDrag={(id, to) => editor.preview(moveActor(drill, id, to))}
-            onDragEnd={editor.endGesture}
+            onActorDrag={(id, to) => editor.preview(moveActor(drill, id, to))}
+            onActorDragEnd={editor.endGesture}
+            onRouteStart={(actor, from) => {
+              if (step === null) return
+              const who = drill.actors.find((a) => a.id === actor)
+              if (who?.carriedBy) setMessage(`${actor} is carried; it moves with ${who.carriedBy}. Draw a route for ${who.carriedBy}.`)
+              else if (drill.steps[step].moves.some((m) => m.actor === actor)) setMessage(`${actor} already has a move in this step. Select its route to edit it.`)
+              else {
+                setMessage('')
+                setSelection(null)
+                setDrawing({ actor, points: [from] })
+              }
+            }}
+            onDrawPoint={(at) => setDrawing((d) => (d ? { ...d, points: [...d.points, clampToRink(at)] } : d))}
+            onFinishDrawing={finish}
+            onVertexDrag={(index, to) => reshape((pts) => movePoint(pts, index, clampToRink(to)), true)}
+            onVertexInsert={(after, at) => reshape((pts) => insertPoint(pts, after, clampToRink(at)), true)}
+            onVertexRemove={(index) => reshape((pts) => removePoint(pts, index), false)}
+            onVertexDragEnd={editor.endGesture}
           />
           <aside className="panels">
-            <Palette armed={armed} onArm={setArmed} />
-            {selectedActor && <ActorPanel key={selectedActor.id} drill={drill} actor={selectedActor} onEdit={editor.edit} />}
-            <DetailsPanel drill={drill} onEdit={editor.edit} />
-            {result.issues.length > 0 && (
-              <Issues title="To finish this drill" issues={result.issues} />
+            <StepList drill={drill} planSteps={plan?.steps ?? []} view={step} onView={goTo} onEdit={editor.edit} />
+            {step === null ? (
+              <Palette armed={armed} onArm={setArmed} />
+            ) : (
+              <RouteTools armed={routeStyle} drawing={drawing !== null} onArm={(s) => { setRouteStyle(s); setDrawing(null); setMessage('') }} />
             )}
+            {selectedActor && <ActorPanel key={selectedActor.id} drill={drill} actor={selectedActor} onEdit={editor.edit} />}
+            {selection?.kind === 'route' && selectedRoute && (
+              <RoutePanel
+                key={`${selection.step}-${selection.actor}`}
+                drill={drill}
+                step={selection.step}
+                actor={selection.actor}
+                planned={plan?.steps[selection.step]?.moves.find((m) => m.actor === selection.actor)}
+                stepDuration={plan?.steps[selection.step]?.duration ?? 0}
+                onEdit={editor.edit}
+              />
+            )}
+            <DetailsPanel drill={drill} onEdit={editor.edit} />
+            {result.issues.length > 0 && <Issues title="To finish this drill" issues={result.issues} />}
           </aside>
         </div>
       )}
     </div>
   )
 }
-

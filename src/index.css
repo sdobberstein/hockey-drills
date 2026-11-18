@@ -324,3 +324,55 @@ button.danger {
   padding-left: 1.1rem;
   font-size: 0.85rem;
 }
+
+.actor.fixed {
+  cursor: default;
+}
+
+.steps-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px;
+  display: grid;
+  gap: 4px;
+}
+
+.steps-list button,
+.routes button {
+  width: 100%;
+  text-align: left;
+}
+
+.routes {
+  display: grid;
+  gap: 4px;
+}
+
+.routes button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.step-controls {
+  margin-top: 8px;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0;
+  font-size: 0.9rem;
+}
+
+.notice {
+  background: #fff4cc;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+}
+
+button.active .muted {
+  color: rgba(255, 255, 255, 0.8);
+}
