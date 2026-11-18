@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { downloadDrill } from '../app/share'
+import { copyText, downloadDrill, selfContainedLink } from '../app/share'
 import { drillHash, libraryHash } from '../app/route'
 import { Issues } from '../app/Issues'
 import { parseDrill } from '../engine/parse'
@@ -65,6 +65,8 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
   const [drawing, setDrawing] = useState<Drawing | null>(null)
   const [message, setMessage] = useState('')
   const [previewing, setPreviewing] = useState(false)
+  // A short confirmation next to the toolbar after copying a share link.
+  const [sharedNote, setSharedNote] = useState('')
   // Two ways to work on the same drill: step by step, or as one path per skater.
   const [mode, setMode] = useState<'steps' | 'flow'>('steps')
   // A pass being linked in the flow view, after its first click (where it leaves).
@@ -394,6 +396,18 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
     return () => window.removeEventListener('keydown', onKey)
   })
 
+  /** Copy a link that carries this whole drill, so anyone with the app can open it. */
+  const copyShareLink = async () => {
+    if (!result.drill) return
+    try {
+      await copyText(await selfContainedLink(result.drill))
+      setSharedNote('Share link copied')
+    } catch {
+      setSharedNote('Could not copy: this browser blocked clipboard access')
+    }
+    setTimeout(() => setSharedNote(''), 3000)
+  }
+
   const discard = () => {
     if (!window.confirm('Discard this draft? Your changes will be lost.')) return
     deleteDraft(drill.id)
@@ -444,12 +458,21 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
         >
           Download JSON
         </button>
+        <button
+          type="button"
+          onClick={copyShareLink}
+          disabled={!valid}
+          title={valid ? 'Copy a link that carries this whole drill' : 'Fix the problems first'}
+        >
+          Copy share link
+        </button>
         <button type="button" className="danger" onClick={discard}>
           Discard draft
         </button>
         <span className="status" role="status">
-          {editor.status === 'saved' && 'Draft saved'}
-          {editor.status === 'failed' && 'Could not save a draft (browser storage is unavailable)'}
+          {sharedNote}
+          {!sharedNote && editor.status === 'saved' && 'Draft saved'}
+          {!sharedNote && editor.status === 'failed' && 'Could not save a draft (browser storage is unavailable)'}
         </span>
       </div>
       {message && (
