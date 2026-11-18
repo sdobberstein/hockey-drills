@@ -46,14 +46,16 @@ Drill
   progression?: { series, order }
   actors[]: { id, type, label?, color?, start:[x,y], carriedBy? }
   steps[]:  { name?, notes?, moves[] }
-  move:     { actor, style, speed?, points[] | to, smooth? }
+  move:     { actor, style, speed?, points[] | to, receiver?, smooth? }
 ```
 
 Rules:
 - A step lasts as long as its slowest move; actors not mentioned stay put.
 - A move has either `points` (a path) or `to` (an actor id or a point). Passes and shots normally use `to`.
 - `carriedBy` on an actor (typically the puck) makes it follow that actor until a pass or shot moves it. A pass with `to: <actorId>` hands the puck to that actor on arrival.
-- All moves in a step start together, from the positions at the start of that step. So a puck cannot be released from a carrier who is still moving in the same step; split it into "walk in" then "shoot". A pass target actor is read at the start of the step and must not move in that step. The validator enforces both.
+- All moves in a step start together, from the positions at the start of that step. A released puck (pass, shot, drop-pass) leaves from where its carrier stood when the step began, and the carrier is free to keep skating. If you want a shot to leave from where the carrier *ends up*, put the shot in the next step ("walk in", then "shoot").
+- Passes can be received in stride. `receiver` names who picks the puck up when the release ends (implied when `to` is an actor id). The receiver may be skating; the validator checks they are within 2.5 ft of the landing spot at the instant the puck arrives, and the error says how far off the timing is. A bank off the boards is a pass with `points` (the bounce is a vertex) and a `receiver`.
+- Steps are sync points: a step ends when its slowest move ends. For continuous skating with no pause, split an actor's path across steps at the same speed, so each segment finishes just as the step does.
 - `speed` is in ft/s; each style has a default.
 - `rink` is a view crop; coordinates are always full-rink.
 - `smooth` is reserved for later and ignored in v1.
