@@ -69,22 +69,44 @@ describe('validateDrill', () => {
     expect(codes(d)).toContain('release-style-needs-puck')
   })
 
-  it('rejects releasing the puck while its carrier is still moving', () => {
-    // The mistake we originally made in the 2-on-1: skate and shoot together.
+  it('lets the passer keep skating as the puck leaves', () => {
+    // Releasing happens at the start of the step, from where the carrier
+    // stood then; the carrier is free to skate on.
     const d = clone(twoOnOne)
-    d.steps[2].moves.push(d.steps[3].moves[0])
-    d.steps.splice(3, 1)
-    expect(codes(d)).toContain('carrier-moves-during-release')
+    d.steps[1].moves.push({ actor: 'F1', style: 'skate', points: [[150, 28], [160, 20]] })
+    expect(validateDrill(d)).toEqual([])
   })
 
-  it('rejects a receiver that moves during the pass', () => {
+  it('rejects a receiver who is not where the pass arrives', () => {
     const d = clone(twoOnOne)
     d.steps[1].moves.push({
       actor: 'F2',
       style: 'skate',
-      points: [[155, 58], [160, 58]],
+      points: [[155, 58], [175, 58]],
     })
-    expect(codes(d)).toContain('receiver-moves-during-pass')
+    // F2 is now somewhere else for the rest of the drill, so later steps also
+    // disagree; we only care that the miss itself is reported.
+    expect(codes(d)).toContain('receiver-misses-pass')
+  })
+
+  it('accepts a receiver who skates onto the landing spot in stride', () => {
+    const d = clone(twoOnOne)
+    // Pass to a spot 10 ft ahead of F2 and have F2 arrive there as it lands.
+    // Distance 150,28 -> 165,58 is 33.5 ft; at 60 ft/s that is 0.559 s, and F2
+    // at 18 ft/s covers 10.05 ft in that time.
+    d.steps[1].moves = [
+      { actor: 'puck', style: 'pass', speed: 60, to: [165, 58], receiver: 'F2' },
+      { actor: 'F2', style: 'skate', speed: 18, points: [[155, 58], [165, 58]] },
+    ]
+    // F2 ends the pass step at 165,58, so the next step must start there.
+    d.steps[2].moves[0] = { actor: 'F2', style: 'skate-puck', speed: 15, points: [[165, 58], [168, 55]] }
+    expect(validateDrill(d)).toEqual([])
+  })
+
+  it('rejects a receiver that does not exist', () => {
+    const d = clone(twoOnOne)
+    d.steps[1].moves[0] = { actor: 'puck', style: 'pass', to: [155, 58], receiver: 'ghost' }
+    expect(codes(d)).toEqual(['unknown-target'])
   })
 
   it('rejects a carried actor moving on its own', () => {

@@ -1,5 +1,6 @@
 import { distance } from './geometry'
 import { planDrill } from './plan'
+import { buildTimeline } from './timeline'
 import type { Drill } from './types'
 
 /**
@@ -33,11 +34,17 @@ export type IssueCode =
   | 'release-style-needs-puck'
   | 'release-without-carrier'
   | 'carried-actor-moves'
-  | 'carrier-moves-during-release'
-  | 'receiver-moves-during-pass'
+  | 'receiver-misses-pass'
 
 /** How far (feet) a path's first point may be from where the actor is. */
 export const PATH_START_TOLERANCE = 0.5
+
+/**
+ * How far (feet) a receiver may be from where a pass lands, at the moment it
+ * lands. A few feet is a pickup in stride; more means the pass and the
+ * receiver's route were not timed together.
+ */
+export const RECEIVE_TOLERANCE = 2.5
 
 export function validateDrill(drill: Drill): Issue[] {
   const issues = checkReferences(drill)
@@ -93,6 +100,13 @@ function checkReferences(drill: Drill): Issue[] {
         })
       }
       movers.add(move.actor)
+      if (move.receiver !== undefined && !actors.has(move.receiver)) {
+        issues.push({
+          code: 'unknown-target',
+          message: `Move names unknown receiver "${move.receiver}".`,
+          location,
+        })
+      }
       if (typeof move.to === 'string' && !actors.has(move.to)) {
         issues.push({
           code: 'unknown-target',
@@ -110,10 +124,9 @@ function checkState(drill: Drill): Issue[] {
   const issues: Issue[] = []
   const types = new Map(drill.actors.map((a) => [a.id, a.type]))
   const plan = planDrill(drill)
+  const timeline = buildTimeline(drill)
 
   plan.steps.forEach((step, si) => {
-    const movers = new Set(step.moves.map((m) => m.actor))
-
     step.moves.forEach((move, mi) => {
       const location = `steps[${si}].moves[${mi}]`
       const carrier = step.before.carriers.get(move.actor)
@@ -142,22 +155,21 @@ function checkState(drill: Drill): Issue[] {
             message: `"${move.actor}" is ${move.style}ed but nobody is carrying it at this point.`,
             location,
           })
-        } else if (movers.has(carrier)) {
-          // The puck leaves from where the carrier *starts* the step, so a
-          // moving carrier would make it fly from the wrong place. Split the
-          // drill into "carrier moves" then "puck is released".
-          issues.push({
-            code: 'carrier-moves-during-release',
-            message: `"${carrier}" moves in the same step that "${move.actor}" is released; put the release in its own step.`,
-            location,
-          })
         }
-        if (move.receiver && movers.has(move.receiver)) {
-          issues.push({
-            code: 'receiver-moves-during-pass',
-            message: `"${move.receiver}" moves while receiving a pass; the pass aims at where it starts the step.`,
-            location,
-          })
+        if (move.receiver) {
+          // The receiver may be skating (a pickup in stride), so ask the
+          // timeline where they are at the instant the puck arrives, and
+          // compare with where the pass lands. This replaces the old rule that
+          // receivers had to stand still, which real passes do not.
+          const lands = move.path[move.path.length - 1]
+          const there = timeline.at(step.start + move.duration)[move.receiver]
+          if (distance(there, lands) > RECEIVE_TOLERANCE) {
+            issues.push({
+              code: 'receiver-misses-pass',
+              message: `The ${move.style} lands at [${fmt(lands)}] after ${move.duration.toFixed(2)}s, but "${move.receiver}" is at [${fmt(there)}] then. Adjust the pass target, speed, or the receiver's route.`,
+              location,
+            })
+          }
         }
       } else if (carrier) {
         issues.push({
@@ -171,3 +183,5 @@ function checkState(drill: Drill): Issue[] {
 
   return issues
 }
+
+const fmt = (p: readonly [number, number]) => p.map((n) => n.toFixed(1)).join(', ')
