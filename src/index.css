@@ -621,3 +621,15 @@ button.active .muted {
   border-radius: 0 6px 6px 0;
   margin-left: -1px;
 }
+
+.loaded {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid #9ec5a0;
+  border-radius: 8px;
+  background: #f4fbf4;
+}
+
+.loaded p {
+  margin: 0 0 8px;
+}

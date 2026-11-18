@@ -175,3 +175,17 @@ export function setDetails(
 export function parseTags(text: string): string[] {
   return [...new Set(text.split(',').map((t) => t.trim()).filter(Boolean))]
 }
+
+/**
+ * A copy of a drill ready to be edited as a draft. It keeps its id when that is
+ * free, so a draft you made yourself keeps its name. When the id is taken (by a
+ * library drill, or a draft you already have) it gets a new one and a "(copy)"
+ * title, so opening something never overwrites what is already there.
+ */
+export function copyForEditing(drill: Drill, taken: ReadonlySet<string>): Drill {
+  const copy = structuredClone(drill)
+  if (!taken.has(copy.id)) return copy
+  copy.id = uniqueDrillId(copy.id, taken)
+  copy.title = copy.title.endsWith('(copy)') ? copy.title : `${copy.title} (copy)`
+  return copy
+}

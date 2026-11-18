@@ -5,6 +5,7 @@ import {
   addActor,
   blankDrill,
   clampToRink,
+  copyForEditing,
   deleteActor,
   moveActor,
   nextActorId,
@@ -185,5 +186,34 @@ describe('setDetails and tags', () => {
   it('parses a tag list: trimmed, no blanks, no repeats', () => {
     expect(parseTags(' rush, offence ,, rush ')).toEqual(['rush', 'offence'])
     expect(parseTags('')).toEqual([])
+  })
+})
+
+describe('copyForEditing', () => {
+  it('keeps the id and title when the id is free', () => {
+    const copy = copyForEditing(twoOnOne, new Set(['something-else']))
+    expect(copy.id).toBe('2-on-1')
+    expect(copy.title).toBe(twoOnOne.title)
+  })
+
+  it('gives a new id and a "(copy)" title when the id is taken, so nothing is overwritten', () => {
+    const copy = copyForEditing(twoOnOne, new Set(['2-on-1']))
+    expect(copy.id).toBe('2-on-1-2')
+    expect(copy.title).toBe(`${twoOnOne.title} (copy)`)
+  })
+
+  it('finds the next free id when several are taken', () => {
+    expect(copyForEditing(twoOnOne, new Set(['2-on-1', '2-on-1-2', '2-on-1-3'])).id).toBe('2-on-1-4')
+  })
+
+  it('does not stack "(copy)" on a title that already has it', () => {
+    const d = { ...clone(twoOnOne), title: 'Rush (copy)' }
+    expect(copyForEditing(d, new Set(['2-on-1'])).title).toBe('Rush (copy)')
+  })
+
+  it('is a real copy: editing it leaves the original alone', () => {
+    const copy = copyForEditing(twoOnOne, new Set())
+    copy.actors[0].start = [1, 1]
+    expect(twoOnOne.actors[0].start).toEqual([95, 25])
   })
 })

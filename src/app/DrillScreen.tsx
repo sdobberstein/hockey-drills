@@ -4,6 +4,7 @@ import { libraryDrills } from '../library/drills'
 import { neighbours, seriesTitle } from '../library/library'
 import { Player } from '../player/Player'
 import { ShareBar } from './ShareBar'
+import { startEditing } from './share'
 
 /** A drill with its title, share actions, progression links and player. */
 export function DrillScreen({ drill, inLibrary }: { drill: Drill; inLibrary: boolean }) {
@@ -15,6 +16,16 @@ export function DrillScreen({ drill, inLibrary }: { drill: Drill; inLibrary: boo
         <a href={libraryHash()}>← Library</a>
         {inLibrary && <a href={editHash(drill.id)}>Edit a copy</a>}
         {!inLibrary && <span className="badge">Shared drill, not in the library</span>}
+        {!inLibrary && (
+          <button
+            type="button"
+            onClick={() => {
+              if (!startEditing(drill)) window.alert('Could not make a draft: this browser is not letting the app save anything.')
+            }}
+          >
+            Edit a copy
+          </button>
+        )}
       </nav>
 
       <h2 className="drill-title">{drill.title}</h2>
