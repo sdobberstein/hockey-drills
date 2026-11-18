@@ -1,7 +1,7 @@
 import Ajv2020, { type ErrorObject } from 'ajv/dist/2020'
 import schema from '../../schema/drill.schema.json'
 import type { Drill } from './types'
-import { validateDrill, type Issue } from './validate'
+import { validateDrill, type Issue, type Suggestion } from './validate'
 
 /**
  * The one door for a drill that comes from outside the repo (a share link, a
@@ -21,6 +21,8 @@ export interface ParseIssue {
   code: Issue['code'] | 'schema'
   message: string
   location: string
+  /** A concrete fix, when the validator could work one out. */
+  suggestion?: Suggestion
 }
 
 export interface ParseResult {
