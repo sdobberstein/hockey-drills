@@ -16,7 +16,7 @@ Personal-use web app for creating, animating and sharing hockey drills. Planning
 | Sharing | Hash links: `#/drill/<id>` and `#/d/<compressed-json>` |
 | Animation | Model C: ordered steps, each containing moves |
 | Progressions | Independent drill files linked by `progression` metadata |
-| Paths | Straight segments first; optional `smooth` flag later |
+| Paths | Straight segments by default; optional `smooth` flag curves a path through its points |
 | Out of scope | 3D, teams, practice plans, MP4 export, server-side library |
 
 ## Prior art (summary)
@@ -58,7 +58,7 @@ Rules:
 - Steps are sync points: a step ends when its slowest move ends. For continuous skating with no pause, split an actor's path across steps at the same speed, so each segment finishes just as the step does.
 - `speed` is in ft/s; each style has a default.
 - `rink` is a view crop; coordinates are always full-rink.
-- `smooth` is reserved for later and ignored in v1.
+- `smooth: true` rounds a `points` path into a smooth curve through the same points (a centripetal Catmull-Rom spline, densified into a polyline by the engine), so a curve's length, and therefore its duration, is the curve's own length. It does not apply to `to` moves.
 
 Semantic checks beyond the JSON Schema: unknown actor ids, a pass whose puck has no carrier, `to` referencing a missing actor, duplicate actor ids, and series/order collisions across the library.
 
@@ -119,7 +119,7 @@ Sharing: repo drills by id; any drill via deflate + base64url in the URL fragmen
 3. **Library and share links**: index generation, drill list, hash routing, progression grouping.
 4. **Editor**: actors, paths, steps, undo/redo, save-as-new.
 5. **Static diagram and PNG export.**
-6. **Later**: path smoothing, GIF export, more rink views, practice-plan view, `extends` for progressions if duplication becomes painful.
+6. **Later**: GIF export, more rink views, practice-plan view, `extends` for progressions if duplication becomes painful.
 
 The viewer comes before the editor so the model can be judged with hand-written drills before the largest piece of UI is built.
 
