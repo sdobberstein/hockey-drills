@@ -16,7 +16,7 @@
       "name": "Cross on the boards",
       "notes": "F1 walks the puck along the boards toward F2; they pass each other.",
       "moves": [
-        { "actor": "F1", "style": "skate-puck", "speed": 25, "points": [[188, 80], [172, 82], [158, 76]] },
+        { "actor": "F1", "style": "skate-puck", "speed": 25, "smooth": true, "points": [[188, 80], [172, 82], [158, 76]] },
         { "actor": "F2", "style": "skate", "speed": 25, "points": [[125, 80], [156.6, 80]] }
       ]
     },
@@ -25,8 +25,8 @@
       "notes": "F1 banks the puck off the boards into the space ahead of F2, who picks it up in stride. F1 keeps curving up around the circle.",
       "moves": [
         { "actor": "puck", "style": "pass", "speed": 30, "points": [[158, 76], [163, 84], [172, 80]], "receiver": "F2" },
-        { "actor": "F1", "style": "skate", "speed": 25, "points": [[158, 76], [154.5, 72.4], [150.5, 66.5], [148.8, 62], [149.4, 55], [157, 50], [162, 46]] },
-        { "actor": "F2", "style": "skate-puck", "speed": 24, "points": [[156.6, 80], [172, 80], [176, 77], [180, 72], [184, 63]] }
+        { "actor": "F1", "style": "skate", "speed": 25, "smooth": true, "points": [[158, 76], [154.5, 72.4], [150.5, 66.5], [148.8, 62], [149.4, 55], [157, 50], [162, 46]] },
+        { "actor": "F2", "style": "skate-puck", "speed": 24, "smooth": true, "points": [[156.6, 80], [172, 80], [176, 77], [180, 72], [184, 63]] }
       ]
     },
     {
