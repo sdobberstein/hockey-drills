@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { initialState } from '../engine/plan'
+import type { Heading } from '../engine/timeline'
 import type { ActorType, Drill, MoveStyle, Point } from '../engine/types'
 import type { Starts } from '../flow/edit'
 import { segmentsFor, type Segment } from '../flow/timeline'
@@ -36,6 +37,8 @@ interface Props {
   /** Passes and shots, in the order they happen; faint for context, and clickable to select. */
   flights: readonly { index: number; style: MoveStyle; path: readonly Point[] }[]
   selection: Selection
+  /** Which way each skater is heading, so a carried puck is drawn in front of them. */
+  headings?: Readonly<Record<string, Heading>>
   armed: ActorType | null
   /** A run style is chosen: clicking a skater starts a run for them. */
   routeTool: boolean
@@ -72,7 +75,7 @@ const pointsAttr = (pts: readonly Point[]) => pts.map(([x, y]) => `${x},${y}`).j
  * there are no steps here to be "in", only paths.
  */
 export function FlowStage(props: Props) {
-  const { drill, flow, starts, flights, selection, armed, routeTool, drawing, passTool, passFrom, zones } = props
+  const { drill, flow, starts, flights, selection, armed, routeTool, drawing, passTool, passFrom, zones, headings } = props
   const svgRef = useRef<SVGSVGElement>(null)
   const grab = useRef<{ id: string; dx: number; dy: number } | null>(null)
   const vertex = useRef<VertexGrab | null>(null)
@@ -285,7 +288,7 @@ export function FlowStage(props: Props) {
       )}
 
       {ordered.map((actor) => {
-        const [x, y] = displayPosition(actor, frame, drill.actors)
+        const [x, y] = displayPosition(actor, frame, drill.actors, headings)
         const carried = actor.carriedBy !== undefined
         const draggable = !carried && !busy
         const chosen = selection?.kind === 'actor' && selection.id === actor.id

@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import type { PlannedStep } from '../engine/plan'
+import type { Heading } from '../engine/timeline'
 import type { ActorType, Drill, Point } from '../engine/types'
 import { ActorSymbol } from '../render/ActorSymbol'
 import { displayPosition } from '../render/layout'
@@ -19,6 +20,8 @@ interface Props {
   /** The resolved routes, for drawing the lines (curves included). */
   planSteps: readonly PlannedStep[]
   selection: Selection
+  /** Which way each skater is heading, so a carried puck is drawn in front of them. */
+  headings?: Readonly<Record<string, Heading>>
   /** When set, the next click on the ice places an actor of this type. */
   armed: ActorType | null
   /** A route style is chosen: clicking an actor starts a route for it. */
@@ -53,7 +56,7 @@ const ACCENT = 'var(--accent)'
  * handling: coordinates are always full-rink feet.
  */
 export function EditStage(props: Props) {
-  const { drill, step, positions, planSteps, selection, armed, routeTool, drawing } = props
+  const { drill, step, positions, planSteps, selection, armed, routeTool, drawing, headings } = props
   const svgRef = useRef<SVGSVGElement>(null)
   // Where, relative to the pointer, an actor was grabbed, so it does not jump.
   const grab = useRef<{ id: string; dx: number; dy: number } | null>(null)
@@ -252,7 +255,7 @@ export function EditStage(props: Props) {
       )}
 
       {ordered.map((actor) => {
-        const [x, y] = displayPosition(actor, frame, drill.actors)
+        const [x, y] = displayPosition(actor, frame, drill.actors, headings)
         const carried = actor.carriedBy !== undefined
         const draggable = step === null && !carried && !busy
         const chosen = selection?.kind === 'actor' && selection.id === actor.id

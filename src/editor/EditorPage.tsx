@@ -3,6 +3,7 @@ import { downloadDrill } from '../app/share'
 import { drillHash, libraryHash } from '../app/route'
 import { Issues } from '../app/Issues'
 import { parseDrill } from '../engine/parse'
+import { headingsAt, timelineOf } from '../engine/timeline'
 import { initialState, planDrill } from '../engine/plan'
 import type { ActorType, Drill, MoveStyle, Point } from '../engine/types'
 import { editViaFlow } from '../flow/apply'
@@ -82,6 +83,13 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
       return null // a drill that cannot be planned still shows its actors
     }
   }, [drill])
+  // Which way each skater is heading where the stage is showing them, so a carried puck is drawn in
+  // front of them: at the start of the step being edited, or at the very start in Setup and the flow view.
+  const headings = useMemo(() => {
+    if (!plan || drill.steps.length === 0) return {}
+    const at = mode === 'steps' && step !== null ? (plan.steps[step]?.start ?? 0) : 0
+    return headingsAt(timelineOf(plan), drill.actors.filter((a) => a.type !== 'puck').map((a) => a.id), at)
+  }, [plan, drill, mode, step])
   const flow = useMemo(() => drillToFlow(drill), [drill])
   const starts = useMemo<Starts>(() => Object.fromEntries(drill.actors.map((a) => [a.id, a.start])), [drill])
   // Passes and shots, shown faint under the paths in the flow view.
@@ -458,6 +466,7 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
           {mode === 'flow' && flow ? (
             <FlowStage
               drill={drill}
+              headings={headings}
               flow={flow}
               starts={starts}
               flights={flights}
@@ -505,6 +514,7 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
           ) : (
           <EditStage
             drill={drill}
+            headings={headings}
             step={step}
             positions={positions}
             planSteps={plan?.steps ?? []}

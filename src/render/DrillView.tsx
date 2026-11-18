@@ -1,4 +1,4 @@
-import type { Frame } from '../engine/timeline'
+import type { Frame, Heading } from '../engine/timeline'
 import type { Plan } from '../engine/plan'
 import type { Drill } from '../engine/types'
 import { ActorSymbol } from './ActorSymbol'
@@ -14,6 +14,8 @@ interface Props {
   frame: Frame
   /** Step to draw at full strength; the others are faded. Null shows all equally. */
   activeStep: number | null
+  /** Which way each skater is heading, so a carried puck is drawn out in front of them. */
+  headings?: Readonly<Record<string, Heading>>
 }
 
 /**
@@ -23,7 +25,7 @@ interface Props {
  * This component only draws. All timing lives in the engine, which is why
  * scrubbing and playback can share it.
  */
-export function DrillView({ drill, plan, frame, activeStep }: Props) {
+export function DrillView({ drill, plan, frame, activeStep, headings }: Props) {
   // Pucks are drawn last so they are never hidden under a player.
   const ordered = [...drill.actors].sort((a, b) => Number(a.type === 'puck') - Number(b.type === 'puck'))
 
@@ -54,7 +56,7 @@ export function DrillView({ drill, plan, frame, activeStep }: Props) {
         )),
       )}
       {ordered.map((actor) => {
-        const [x, y] = displayPosition(actor, frame, drill.actors)
+        const [x, y] = displayPosition(actor, frame, drill.actors, headings)
         return (
           <g key={actor.id} transform={`translate(${x} ${y})`}>
             <ActorSymbol actor={actor} />
