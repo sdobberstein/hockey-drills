@@ -208,3 +208,29 @@ export function puckCarriedBy(model: TimelineModel, actor: string, t: number, sl
   for (const row of model.pucks) if (carrierAtTime(model, row.actor, t, slack) === actor) return row.actor
   return null
 }
+
+/** Said when a drill has no puck at all, which "skate with puck" (only a line style) does not give it. */
+export const NO_PUCK_MESSAGE =
+  'This drill has no puck yet. “Skate with puck” is only a line style. Add a real puck under “Add to the ice”, then set who carries it.'
+
+/**
+ * Why a skater does not have the puck at a moment, in words that say what to do.
+ * The reason matters: "nobody has it" is wrong when there is no puck at all, and
+ * unhelpful when the puck was simply never given to anyone.
+ */
+export function whyNoPuck(drill: Drill, model: TimelineModel, actor: string, time: number): string {
+  const pucks = drill.actors.filter((a) => a.type === 'puck')
+  if (pucks.length === 0) return NO_PUCK_MESSAGE
+
+  const at = `${time.toFixed(2)} s`
+  const holder = model.pucks.map((p) => carrierAtTime(model, p.actor, time)).find(Boolean)
+  if (holder) return `${actor} does not have the puck at ${at}; ${holder} does.`
+
+  const flying = model.pucks.some((p) => p.spans.some((s) => s.flight && time >= s.t0 && time <= s.t1))
+  if (flying) return `The puck is in the air at ${at}: a pass or shot is on its way. Release this one after it lands.`
+
+  const neverCarried = pucks.every((p) => !p.carriedBy) && model.links.length === 0
+  if (neverCarried) return `The puck is not being carried by anyone. Select it and set “Carried by” to ${actor}.`
+
+  return `Nobody has the puck at ${at}: it is loose after a pass or shot that nobody received.`
+}

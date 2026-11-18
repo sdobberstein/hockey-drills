@@ -11,7 +11,7 @@ import { drillToFlow } from '../flow/import'
 import { appendRun, pathEnd, removeRun, setRunPoints } from '../flow/pathEdit'
 import { addPass, believable, endMarker, explain, followers, landingZones, locateOnPath, removePass, snapToLanding } from '../flow/passEdit'
 import { pointAlong } from '../engine/geometry'
-import { buildTimelineModel, carrierAtTime, mergedFlights, puckCarriedBy } from '../flow/view'
+import { buildTimelineModel, mergedFlights, NO_PUCK_MESSAGE, puckCarriedBy, whyNoPuck } from '../flow/view'
 import type { After, EventTarget, Marker } from '../flow/types'
 import { segmentsFor } from '../flow/timeline'
 import type { Flow } from '../flow/types'
@@ -243,8 +243,7 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
 
       const puck = puckCarriedBy(model, actor, time)
       if (!puck) {
-        const holder = model.pucks.map((p) => carrierAtTime(model, p.actor, time)).find(Boolean)
-        setMessage(holder ? `${actor} does not have the puck at ${time.toFixed(2)} s; ${holder} does.` : `Nobody has the puck at ${time.toFixed(2)} s: it is in the air or loose.`)
+        setMessage(whyNoPuck(drill, model, actor, time))
         return
       }
       // At the instant a pass lands on this skater, it is a release taken as the puck arrives.
@@ -535,7 +534,8 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
                 // Clicking the puck, or the player carrying it, starts a release.
                 const carried = plan?.steps[step]?.before.carriers
                 const puck = who?.type === 'puck' ? who.id : [...(carried ?? [])].find(([, carrier]) => carrier === actor)?.[0]
-                if (!puck || !carried?.has(puck)) setMessage('Click the player who has the puck.')
+                if (!drill.actors.some((a) => a.type === 'puck')) setMessage(NO_PUCK_MESSAGE)
+                else if (!puck || !carried?.has(puck)) setMessage('Click the player who has the puck.')
                 else if (drill.steps[step].moves.some((m) => m.actor === puck)) {
                   // Do not leave a dead end: select the move that is in the way so it can be edited.
                   stopDrawing()
@@ -640,6 +640,7 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
                 <RouteTools
                   armed={routeStyle}
                   drawing={drawing !== null || passDraft !== null}
+                  noPuck={!drill.actors.some((a) => a.type === 'puck')}
                   flow
                   onArm={(s) => {
                     setRouteStyle(s)
@@ -654,7 +655,7 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
                 {step === null ? (
                   <Palette armed={armed} onArm={setArmed} />
                 ) : (
-                  <RouteTools armed={routeStyle} drawing={drawing !== null} onArm={(s) => { setRouteStyle(s); setDrawing(null); setMessage('') }} />
+                  <RouteTools armed={routeStyle} drawing={drawing !== null} noPuck={!drill.actors.some((a) => a.type === 'puck')} onArm={(s) => { setRouteStyle(s); setDrawing(null); setMessage('') }} />
                 )}
               </>
             )}

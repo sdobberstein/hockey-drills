@@ -18,8 +18,14 @@ export interface Drawing {
   points: Point[]
 }
 
-/** Two clicks closer than this (feet) are one point, which is what a double-click produces. */
-export const SAME_POINT = 0.3
+/**
+ * Two clicks closer than this (feet) are one point, which is what a double-click
+ * produces. The pointer moves a few pixels between the two presses, which is
+ * several tenths of a foot at the zoom the ice is usually shown at, and a final
+ * segment that short is just a hook in the line (the arrowhead and a pivot's curl
+ * both draw badly on it), so be generous.
+ */
+export const SAME_POINT = 1
 
 /**
  * Close off a route being drawn. A double-click sends a click for each press

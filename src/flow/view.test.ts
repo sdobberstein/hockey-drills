@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { cycleGiveAndGo, stopAndWait, twoOnOne } from '../engine/fixtures'
-import { buildTimelineModel } from './view'
+import { buildTimelineModel, NO_PUCK_MESSAGE, whyNoPuck } from './view'
 
 describe('the timeline model', () => {
   const model = buildTimelineModel(stopAndWait)!
@@ -80,5 +80,33 @@ describe('the steps and names', () => {
   it('refuses a drill it cannot read', () => {
     const broken = { ...stopAndWait, steps: [{ moves: [{ actor: 'ghost', style: 'skate' as const, points: [[0, 0], [1, 1]] as [number, number][] }] }] }
     expect(buildTimelineModel(broken)).toBeNull()
+  })
+})
+
+describe('why a skater has no puck', () => {
+  const userLike = () => ({ ...stopAndWait, actors: stopAndWait.actors.filter((a) => a.type !== 'puck'), steps: stopAndWait.steps.filter((s) => s.moves.every((m) => m.actor !== 'puck')) })
+
+  it('says there is no puck at all, and that a line style does not make one', () => {
+    const d = userLike()
+    const msg = whyNoPuck(d, buildTimelineModel(d)!, 'F1', 1)
+    expect(msg).toBe(NO_PUCK_MESSAGE)
+    expect(msg).toContain('only a line style')
+  })
+
+  it('says who does have it, when someone else does', () => {
+    const model = buildTimelineModel(twoOnOne)!
+    expect(whyNoPuck(twoOnOne, model, 'F2', 1)).toContain('F1 does')
+  })
+
+  it('says it is in the air during a pass', () => {
+    const model = buildTimelineModel(stopAndWait)!
+    expect(whyNoPuck(stopAndWait, model, 'F2', 3.0)).toContain('in the air')
+  })
+
+  it('says to give a loose puck a carrier when it was never carried', () => {
+    const d = { ...userLike(), actors: [...userLike().actors, { id: 'puck', type: 'puck' as const, start: [30, 30] as [number, number] }] }
+    const msg = whyNoPuck(d, buildTimelineModel(d)!, 'F1', 1)
+    expect(msg).toContain('Carried by')
+    expect(msg).toContain('F1')
   })
 })

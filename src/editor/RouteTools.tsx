@@ -22,6 +22,8 @@ interface Props {
   onArm: (style: MoveStyle | null) => void
   /** Show the pass and shot tools. The flow view has no passes to draw yet. */
   releases?: boolean
+  /** The drill has no puck, so a pass or shot has nothing to act on: say so next to the tools. */
+  noPuck?: boolean
   /** Describe the second click: in the flow view a run is added to the end of a skater's path. */
   flow?: boolean
 }
@@ -48,7 +50,7 @@ function StyleButtons({ styles, armed, onArm }: { styles: readonly MoveStyle[]; 
 }
 
 /** Choose a line style, then click an actor and click out its route. */
-export function RouteTools({ armed, drawing, onArm, releases = true, flow = false }: Props) {
+export function RouteTools({ armed, drawing, onArm, releases = true, flow = false, noPuck = false }: Props) {
   const releasing = armed !== null && RELEASE_STYLES.includes(armed)
   return (
     <>
@@ -59,6 +61,12 @@ export function RouteTools({ armed, drawing, onArm, releases = true, flow = fals
       {releases ? (
         <section>
           <h3>Pass or shoot</h3>
+          {noPuck && (
+            <p className="notice" role="note">
+              There is no puck in this drill yet, so there is nothing to pass or shoot. “Skate with puck” is only a line style: add a puck under
+              “Add to the ice” and set who carries it.
+            </p>
+          )}
           <StyleButtons styles={RELEASE_STYLES} armed={armed} onArm={onArm} />
           <p className="hint">
             {flow
