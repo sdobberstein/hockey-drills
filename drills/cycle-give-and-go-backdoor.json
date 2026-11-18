@@ -2,50 +2,57 @@
   "version": 1,
   "id": "cycle-give-and-go-backdoor",
   "title": "Cycle Give and Go: Backdoor",
-  "description": "Variation of Cycle Give and Go. F3 times a run in from the far side so they arrive on the backdoor. F2 passes to F1, who one-touches it over to F3 for the shot.",
+  "description": "Variation of Cycle Give and Go. F3 times a run in from the far side so they arrive on the backdoor. F2 passes to F1, who one-touches it over to F3 in stride, and F3 shoots.",
   "tags": ["passing", "shooting", "cycle"],
   "rink": "half-right",
   "progression": { "series": "cycle-give-and-go", "order": 2 },
   "actors": [
-    { "id": "F1", "type": "forward", "label": "1", "start": [191, 78] },
-    { "id": "F2", "type": "forward", "label": "2", "start": [128, 78] },
+    { "id": "F1", "type": "forward", "label": "1", "start": [188, 80] },
+    { "id": "F2", "type": "forward", "label": "2", "start": [125, 80] },
     { "id": "F3", "type": "forward", "label": "3", "start": [192, 10] },
-    { "id": "puck", "type": "puck", "start": [191, 78], "carriedBy": "F1" }
+    { "id": "puck", "type": "puck", "start": [188, 80], "carriedBy": "F1" }
   ],
   "steps": [
     {
-      "name": "Walk the boards",
+      "name": "Cross on the boards",
       "moves": [
-        { "actor": "F1", "style": "skate-puck", "points": [[191, 78], [172, 79]] },
-        { "actor": "F2", "style": "skate", "points": [[128, 78], [166, 79]] }
+        { "actor": "F1", "style": "skate-puck", "speed": 25, "points": [[188, 80], [172, 82], [158, 76]] },
+        { "actor": "F2", "style": "skate", "speed": 25, "points": [[125, 80], [156.6, 80]] }
       ]
     },
     {
       "name": "Bump pass",
-      "moves": [{ "actor": "puck", "style": "pass", "to": "F2" }]
-    },
-    {
-      "name": "Around the circle",
       "moves": [
-        { "actor": "F1", "style": "skate", "points": [[172, 79], [160, 77], [154.5, 72.4], [148.8, 62], [149.4, 55], [157, 50]] },
-        { "actor": "F2", "style": "skate-puck", "speed": 12, "points": [[166, 79], [172, 79], [178, 73], [185, 66]] }
+        { "actor": "puck", "style": "pass", "speed": 30, "points": [[158, 76], [163, 84], [172, 80]], "receiver": "F2" },
+        { "actor": "F1", "style": "skate", "speed": 25, "points": [[158, 76], [154.5, 72.4], [150.5, 66.5], [148.8, 62], [149.4, 55], [157, 50], [162, 46]] },
+        { "actor": "F2", "style": "skate-puck", "speed": 24, "points": [[156.6, 80], [172, 80], [176, 77], [180, 72], [184, 63]] }
       ]
     },
     {
       "name": "Give and go",
-      "notes": "F3 times the run so they arrive on the backdoor as the pass reaches F1.",
+      "notes": "F3 times the run so they come in on the backdoor as F1 receives.",
       "moves": [
-        { "actor": "puck", "style": "pass", "to": "F1" },
-        { "actor": "F3", "style": "skate", "points": [[192, 10], [188, 20], [179, 31]] }
+        { "actor": "puck", "style": "pass", "speed": 55, "to": [172, 44], "receiver": "F1" },
+        { "actor": "F1", "style": "skate", "speed": 25, "points": [[162, 46], [172, 44], [176, 43.5]] },
+        { "actor": "F2", "style": "skate", "speed": 24, "points": [[184, 63], [185, 56], [184, 50]] },
+        { "actor": "F3", "style": "skate", "speed": 25, "points": [[192, 10], [188, 20], [186.5, 23.6]] }
       ]
     },
     {
       "name": "One-touch",
-      "moves": [{ "actor": "puck", "style": "pass", "to": "F3" }]
+      "notes": "F1 one-touches it over to F3, who picks it up in stride.",
+      "moves": [
+        { "actor": "puck", "style": "pass", "speed": 55, "to": [183.2, 29.6], "receiver": "F3" },
+        { "actor": "F1", "style": "skate", "speed": 25, "points": [[176, 43.5], [182, 43]] },
+        { "actor": "F3", "style": "skate", "speed": 25, "points": [[186.5, 23.6], [183, 30], [181, 33]] }
+      ]
     },
     {
       "name": "Shot",
-      "moves": [{ "actor": "puck", "style": "shoot", "to": [189, 42.5] }]
+      "moves": [
+        { "actor": "puck", "style": "shoot", "speed": 90, "to": [189, 42.5] },
+        { "actor": "F3", "style": "skate", "speed": 25, "points": [[181, 33], [180, 38]] }
+      ]
     }
   ]
 }

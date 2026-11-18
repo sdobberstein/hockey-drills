@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { twoOnOne } from './fixtures'
+import { cycleGiveAndGo, twoOnOne } from './fixtures'
 import { buildTimeline, stepIndexAt } from './timeline'
 
 const timeline = buildTimeline(twoOnOne)
@@ -68,5 +68,36 @@ describe('buildTimeline (2-on-1)', () => {
     expect(stepIndexAt(timeline.plan, pass.start)).toBe(1)
     expect(stepIndexAt(timeline.plan, walkIn.start + 0.01)).toBe(2)
     expect(stepIndexAt(timeline.plan, timeline.duration)).toBe(3)
+  })
+})
+
+describe('banked pass to a skating receiver (Cycle Give and Go)', () => {
+  const tl = buildTimeline(cycleGiveAndGo)
+  const bump = tl.plan.steps[1]
+  const puckMove = bump.moves.find((m) => m.actor === 'puck')!
+
+  it('sends the puck off the boards on the way', () => {
+    // The first leg ends at the boards (y = 84), reached after leg 1 / speed.
+    const atBoards = tl.at(bump.start + 9.43 / puckMove.speed).puck
+    expect(atBoards[1]).toBeGreaterThan(83)
+  })
+
+  it('has F2 skating through, not standing, when the puck lands', () => {
+    const before = tl.at(bump.start + puckMove.duration - 0.2).F2
+    const after = tl.at(bump.start + puckMove.duration + 0.2).F2
+    expect(after[0]).toBeGreaterThan(before[0] + 3)
+  })
+
+  it('puts the puck on F2 at the landing spot, then carries it with F2', () => {
+    const landed = tl.at(bump.start + puckMove.duration)
+    expect(Math.hypot(landed.puck[0] - landed.F2[0], landed.puck[1] - landed.F2[1])).toBeLessThan(0.01)
+    const later = tl.at(bump.start + bump.duration)
+    expect(later.puck).toEqual(later.F2)
+  })
+
+  it('keeps the passer moving while the puck leaves', () => {
+    const f1Start = tl.at(bump.start).F1
+    const f1Soon = tl.at(bump.start + 0.2).F1
+    expect(Math.hypot(f1Soon[0] - f1Start[0], f1Soon[1] - f1Start[1])).toBeGreaterThan(3)
   })
 })

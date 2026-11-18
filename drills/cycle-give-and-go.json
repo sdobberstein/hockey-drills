@@ -2,42 +2,48 @@
   "version": 1,
   "id": "cycle-give-and-go",
   "title": "Cycle Give and Go",
-  "description": "F1 walks the puck along the boards toward F2 and bumps it back off the boards. F1 curves around the circle into the slot while F2 carries the puck around the lower, goal-side part of the circle. F2 passes to F1, who shoots. Adapted from the Cycle Give and Go drill on weisstechhockey.com.",
+  "description": "F1 walks the puck along the boards toward F2, and the two pass each other. As F1 starts to curve around the circle, F1 banks the puck off the boards into the space where F2 picks it up in stride. F1 continues around the circle into the slot while F2 carries the puck around the lower, goal-side part of the circle. F2 passes to F1 in stride, and F1 shoots. Adapted from the Cycle Give and Go drill on weisstechhockey.com.",
   "tags": ["passing", "shooting", "cycle"],
   "rink": "half-right",
   "progression": { "series": "cycle-give-and-go", "order": 1 },
   "actors": [
-    { "id": "F1", "type": "forward", "label": "1", "start": [191, 78] },
-    { "id": "F2", "type": "forward", "label": "2", "start": [128, 78] },
-    { "id": "puck", "type": "puck", "start": [191, 78], "carriedBy": "F1" }
+    { "id": "F1", "type": "forward", "label": "1", "start": [188, 80] },
+    { "id": "F2", "type": "forward", "label": "2", "start": [125, 80] },
+    { "id": "puck", "type": "puck", "start": [188, 80], "carriedBy": "F1" }
   ],
   "steps": [
     {
-      "name": "Walk the boards",
+      "name": "Cross on the boards",
+      "notes": "F1 walks the puck along the boards toward F2; they pass each other.",
       "moves": [
-        { "actor": "F1", "style": "skate-puck", "points": [[191, 78], [172, 79]] },
-        { "actor": "F2", "style": "skate", "points": [[128, 78], [166, 79]] }
+        { "actor": "F1", "style": "skate-puck", "speed": 25, "points": [[188, 80], [172, 82], [158, 76]] },
+        { "actor": "F2", "style": "skate", "speed": 25, "points": [[125, 80], [156.6, 80]] }
       ]
     },
     {
       "name": "Bump pass",
-      "moves": [{ "actor": "puck", "style": "pass", "to": "F2" }]
-    },
-    {
-      "name": "Around the circle",
-      "notes": "F1 curves around the outside of the circle into the slot. F2 carries the puck around the lower, goal-side part of the circle.",
+      "notes": "F1 banks the puck off the boards into the space ahead of F2, who picks it up in stride. F1 keeps curving up around the circle.",
       "moves": [
-        { "actor": "F1", "style": "skate", "points": [[172, 79], [160, 77], [154.5, 72.4], [148.8, 62], [149.4, 55], [157, 50]] },
-        { "actor": "F2", "style": "skate-puck", "speed": 12, "points": [[166, 79], [172, 79], [178, 73], [185, 66]] }
+        { "actor": "puck", "style": "pass", "speed": 30, "points": [[158, 76], [163, 84], [172, 80]], "receiver": "F2" },
+        { "actor": "F1", "style": "skate", "speed": 25, "points": [[158, 76], [154.5, 72.4], [150.5, 66.5], [148.8, 62], [149.4, 55], [157, 50], [162, 46]] },
+        { "actor": "F2", "style": "skate-puck", "speed": 24, "points": [[156.6, 80], [172, 80], [176, 77], [180, 72], [184, 63]] }
       ]
     },
     {
       "name": "Give and go",
-      "moves": [{ "actor": "puck", "style": "pass", "to": "F1" }]
+      "notes": "F2 passes to F1 as F1 skates into the slot. Neither stops.",
+      "moves": [
+        { "actor": "puck", "style": "pass", "speed": 55, "to": [172, 44], "receiver": "F1" },
+        { "actor": "F1", "style": "skate", "speed": 25, "points": [[162, 46], [172, 44], [176, 43.5]] },
+        { "actor": "F2", "style": "skate", "speed": 24, "points": [[184, 63], [185, 56], [184, 50]] }
+      ]
     },
     {
       "name": "Shot",
-      "moves": [{ "actor": "puck", "style": "shoot", "to": [189, 42.5] }]
+      "moves": [
+        { "actor": "puck", "style": "shoot", "speed": 90, "to": [189, 42.5] },
+        { "actor": "F1", "style": "skate", "speed": 25, "points": [[176, 43.5], [182, 43]] }
+      ]
     }
   ]
 }
