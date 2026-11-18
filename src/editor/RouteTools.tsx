@@ -63,7 +63,7 @@ export function RouteTools({ armed, drawing, onArm, releases = true, flow = fals
           <p className="hint">
             {flow
               ? drawing
-                ? 'Now click where it lands: the receiver\'s path, a skater (it lands where their run ends), or the ice. Esc cancels.'
+                ? 'Green marks where on the other paths it can land. Click in the green, or near it. Click elsewhere on the ice for a loose pass. Esc cancels.'
                 : armed
                   ? 'Click the passer\'s path at the point where the pass leaves.'
                   : 'Pick a style, then click a path.'

@@ -49,6 +49,8 @@ interface Props {
   passTool: boolean
   /** Where the pass being linked leaves, once that is chosen: drawn with a line to the pointer. */
   passFrom: Point | null
+  /** Stretches of other skaters' paths where that pass could land, drawn in green to aim at. */
+  zones: readonly { actor: string; points: readonly Point[] }[]
   onPassClick: (click: PassClick) => void
   onDrawPoint: (at: Point, onActor?: string) => void
   onFinishDrawing: () => void
@@ -70,7 +72,7 @@ const pointsAttr = (pts: readonly Point[]) => pts.map(([x, y]) => `${x},${y}`).j
  * there are no steps here to be "in", only paths.
  */
 export function FlowStage(props: Props) {
-  const { drill, flow, starts, flights, selection, armed, routeTool, drawing, passTool, passFrom } = props
+  const { drill, flow, starts, flights, selection, armed, routeTool, drawing, passTool, passFrom, zones } = props
   const svgRef = useRef<SVGSVGElement>(null)
   const grab = useRef<{ id: string; dx: number; dy: number } | null>(null)
   const vertex = useRef<VertexGrab | null>(null)
@@ -161,6 +163,14 @@ export function FlowStage(props: Props) {
           </g>
         )
       })}
+
+      {/* Where the pass being linked could land: a soft wide band to aim at, with a clear line down the middle. */}
+      {zones.map((z, i) => (
+        <g key={`z${i}`} pointerEvents="none" fill="none" strokeLinecap="round" strokeLinejoin="round">
+          <polyline className="landing-zone" points={pointsAttr(z.points)} stroke="#2e9e4f" strokeOpacity={0.22} strokeWidth={9} />
+          <polyline points={pointsAttr(z.points)} stroke="#2e9e4f" strokeOpacity={0.9} strokeWidth={1.1} />
+        </g>
+      ))}
 
       {/* Each skater's runs. */}
       {[...segments].flatMap(([actor, list]) =>

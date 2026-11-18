@@ -9,7 +9,8 @@ import { editViaFlow } from '../flow/apply'
 import { moveLanding, moveRelease, removeWait, setRunSeconds, setWaitSeconds, type Starts } from '../flow/edit'
 import { drillToFlow } from '../flow/import'
 import { appendRun, pathEnd, removeRun, setRunPoints } from '../flow/pathEdit'
-import { addPass, endMarker, locateOnPath, removePass, followers } from '../flow/passEdit'
+import { addPass, believable, endMarker, explain, followers, landingZones, locateOnPath, removePass, snapToLanding } from '../flow/passEdit'
+import { pointAlong } from '../engine/geometry'
 import { buildTimelineModel, carrierAtTime, puckCarriedBy } from '../flow/view'
 import type { After, EventTarget, Marker } from '../flow/types'
 import { segmentsFor } from '../flow/timeline'
@@ -92,6 +93,15 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
     [plan],
   )
   const model = useMemo(() => buildTimelineModel(drill), [drill])
+  // Once a pass's release is chosen: where on the other skaters' paths it could land. A shot goes
+  // to the net, so it has none.
+  const zones = useMemo(
+    () =>
+      flow && passDraft && routeStyle !== 'shoot'
+        ? landingZones(flow, starts, { point: passDraft.point, time: passDraft.time }, passDraft.carrier)
+        : [],
+    [flow, starts, passDraft, routeStyle],
+  )
   const positions = useMemo(() => {
     const at = step !== null && plan?.steps[step] ? plan.steps[step].before.positions : initialState(drill).positions
     return Object.fromEntries(at)
@@ -242,14 +252,40 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
       }
       // At the instant a pass lands on this skater, it is a release taken as the puck arrives.
       const fed = model.links.findIndex((l, j) => flow.events[j]?.puck === puck && l.to.actor === actor && Math.abs(l.to.t - time) <= 0.15)
-      setMessage('')
       setSelection(null)
       setPassDraft({ puck, from: fed >= 0 ? { after: fed } : marker, carrier: actor, time, point })
+      // If other skaters have paths but none works from here, say so now rather than after a bad click.
+      const others = Object.entries(flow.paths).filter(([id, pieces]) => id !== actor && pieces.some((p) => p.kind === 'run'))
+      const reachable = style === 'shoot' || others.length === 0 || landingZones(flow, starts, { point, time }, actor).length > 0
+      setMessage(reachable ? '' : `From here no other skater's path works for a pass: they get there too soon, or it would need an impossible speed. Release earlier or later on ${actor}'s path, or click the ice for a loose pass.`)
       return
     }
 
-    // Second click: where it lands.
-    let target: EventTarget
+    // Second click: where it lands. A landing that cannot work is moved onto the nearest one that
+    // can, or explained, so there is never a message that says "pick somewhere believable" and
+    // leaves you to guess where that is.
+    const from = { point: passDraft.point, time: passDraft.time }
+    // Said after the edit, since a successful edit clears the message.
+    let note = ''
+    const checks = style !== 'shoot'
+    const markerPointOf = (m: Marker): Point => {
+      const seg = segmentsFor(flow.paths[m.actor] ?? [], starts[m.actor])[m.piece]
+      return seg ? (seg.piece.kind === 'wait' ? seg.from : pointAlong(seg.geometry, m.at)) : starts[m.actor]
+    }
+    const landOn = (actor: string, marker: Marker, time: number, aimed: Point): EventTarget | null => {
+      if (!checks) return { kind: 'marker', marker }
+      const verdict = believable(from, markerPointOf(marker), time)
+      if (verdict.ok) return { kind: 'marker', marker }
+      const snap = snapToLanding(zones, aimed, 20, actor)
+      if (snap) {
+        note = `That spot did not work for the pass, so it lands at the nearest one that does on ${actor}'s path.`
+        return { kind: 'marker', marker: snap.marker }
+      }
+      setMessage(explain(verdict, actor, passDraft.carrier))
+      return null
+    }
+
+    let target: EventTarget | null
     if (hit.kind === 'path') {
       if (hit.actor === passDraft.carrier) {
         setMessage('Click a different skater\'s path, or the ice.')
@@ -257,19 +293,23 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
       }
       const located = locateOnPath(flow, starts, hit.actor, hit.point)
       if (!located) return
-      target = { kind: 'marker', marker: located.marker }
+      target = landOn(hit.actor, located.marker, located.time, hit.point)
     } else if (hit.kind === 'actor') {
       if (hit.id === passDraft.carrier) return
       const end = endMarker(flow, starts, hit.id)
-      target = end ? { kind: 'marker', marker: end.marker } : { kind: 'point', at: starts[hit.id], receiver: hit.id }
+      target = end ? landOn(hit.id, end.marker, end.time, starts[hit.id]) : { kind: 'point', at: starts[hit.id], receiver: hit.id }
     } else {
-      target = { kind: 'point', at: clampToRink(hit.point) }
+      // On the ice: near a green stretch means "that area"; anywhere else is a loose pass.
+      const snap = checks ? snapToLanding(zones, hit.point, 7) : null
+      target = snap ? { kind: 'marker', marker: snap.marker } : { kind: 'point', at: clampToRink(hit.point) }
     }
+    if (!target) return
 
     const draft = passDraft
     stopDrawing()
     const next = flowEdit((f) => addPass(f, { puck: draft.puck, style, from: draft.from, target }))
     if (!next) return
+    if (note) setMessage(note)
     // Select the pass just made: the one that leaves at the moment that was clicked.
     const made = buildTimelineModel(next)?.links.findIndex((l) => Math.abs(l.from.t - draft.time) <= 0.02 && l.from.actor === draft.carrier)
     if (made !== undefined && made >= 0) setSelection({ kind: 'pass', link: made })
@@ -445,6 +485,7 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
               onActorDragEnd={editor.endGesture}
               passTool={releaseTool}
               passFrom={passDraft?.point ?? null}
+              zones={zones}
               onPassClick={onPassClick}
               onRunStart={(actor) => {
                 const who = drill.actors.find((a) => a.id === actor)
