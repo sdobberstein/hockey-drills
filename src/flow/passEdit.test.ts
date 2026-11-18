@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { stopAndWait } from '../engine/fixtures'
+import { stopAndWait, twoOnOne } from '../engine/fixtures'
 import type { Drill } from '../engine/types'
 import { validateDrill } from '../engine/validate'
 import { editViaFlow } from './apply'
@@ -135,6 +135,15 @@ describe('who has the puck', () => {
   it('says nobody while it is in the air or after it is loose', () => {
     expect(carrierAtTime(model, 'puck', 3.0)).toBeNull() // the first pass is in the air
     expect(carrierAtTime(model, 'puck', 3.55)).toBeNull() // the shot is in the air
+  })
+
+  it('counts a moment a couple of milliseconds before it is received as already carried', () => {
+    // In this drill F2 receives the puck and walks in with it before shooting.
+    const walk = buildTimelineModel(twoOnOne)!
+    const received = walk.pucks[0].spans.find((s) => s.carrier === 'F2')!.t0
+    expect(carrierAtTime(walk, 'puck', received - 0.002)).toBe('F2') // a click meant for that instant, slightly early
+    expect(carrierAtTime(walk, 'puck', received - 0.3)).toBeNull() // but not well before it
+    expect(carrierAtTime(walk, 'puck', received - 0.002, 0)).toBeNull() // and not with no slack
   })
 
   it('names the puck a skater is carrying, or null', () => {

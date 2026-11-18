@@ -146,17 +146,25 @@ export function buildTimelineModel(drill: Drill): TimelineModel | null {
 }
 
 /**
+ * How close to a span a moment may be and still count as inside it (seconds). A
+ * click on the ice is only accurate to a few hundredths of a foot, so a click
+ * meant for the instant a pass lands can come out a couple of milliseconds
+ * early, when the puck is still, strictly, in the air.
+ */
+export const CARRY_SLACK = 0.05
+
+/**
  * Who has a puck at a moment, or null if it is in the air or loose. Used to
  * refuse "F2 passes" at a time F2 does not have the puck, and to say who does.
  */
-export function carrierAtTime(model: TimelineModel, puck: string, t: number): string | null {
+export function carrierAtTime(model: TimelineModel, puck: string, t: number, slack = CARRY_SLACK): string | null {
   const row = model.pucks.find((p) => p.actor === puck)
-  const span = row?.spans.find((s) => t >= s.t0 - 1e-6 && t <= s.t1 + 1e-6 && s.carrier !== null)
+  const span = row?.spans.find((s) => s.carrier !== null && t >= s.t0 - slack && t <= s.t1 + slack)
   return span?.carrier ?? null
 }
 
 /** The puck a skater is carrying at a moment, if any. */
-export function puckCarriedBy(model: TimelineModel, actor: string, t: number): string | null {
-  for (const row of model.pucks) if (carrierAtTime(model, row.actor, t) === actor) return row.actor
+export function puckCarriedBy(model: TimelineModel, actor: string, t: number, slack = CARRY_SLACK): string | null {
+  for (const row of model.pucks) if (carrierAtTime(model, row.actor, t, slack) === actor) return row.actor
   return null
 }
