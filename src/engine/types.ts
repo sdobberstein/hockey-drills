@@ -60,6 +60,12 @@ interface MoveBase {
   speed?: number
   /** Reserved for curved paths; ignored in v1. */
   smooth?: boolean
+  /**
+   * Actor that picks the puck up when this release (pass, shot, drop-pass)
+   * ends. Implied when `to` is an actor id; set it explicitly for a pass that
+   * follows a path, such as a bank off the boards.
+   */
+  receiver?: string
 }
 export interface PathMove extends MoveBase {
   points: Point[]

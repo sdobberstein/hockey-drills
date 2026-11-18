@@ -39,7 +39,7 @@ export interface PlannedMove {
   duration: number
   /** True if this move lets go of a carried puck. */
   releases: boolean
-  /** Actor that picks the puck up on arrival (a pass `to` an actor id). */
+  /** Actor that picks the puck up on arrival. */
   receiver?: string
 }
 
@@ -66,7 +66,9 @@ export interface Plan {
  *
  * This is where the model's key rule lives (PLAN.md, "Data model"): all moves
  * in a step start together, from the positions at the start of that step, and
- * the step lasts as long as its slowest move. That is what makes a pass fire
+ * the step lasts as long as its slowest move. A released puck therefore leaves
+ * from where its carrier stood when the step began, while the carrier is free
+ * to keep skating. That is what makes a pass fire
  * after the attack finishes, without any hand-tuned delay.
  *
  * Assumes the drill has already passed the structural checks in validate.ts
@@ -103,7 +105,9 @@ export function planDrill(drill: Drill): Plan {
         speed,
         duration: pathLength(path) / speed,
         releases,
-        receiver: releases && typeof move.to === 'string' ? move.to : undefined,
+        // A pass aimed at an actor hands over to that actor; a banked or
+        // lead pass names its receiver explicitly.
+        receiver: releases ? (move.receiver ?? (typeof move.to === 'string' ? move.to : undefined)) : undefined,
       }
     })
 
