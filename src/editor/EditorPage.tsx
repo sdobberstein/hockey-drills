@@ -5,6 +5,7 @@ import { Issues } from '../app/Issues'
 import { parseDrill } from '../engine/parse'
 import { initialState, planDrill } from '../engine/plan'
 import type { ActorType, Drill, MoveStyle, Point } from '../engine/types'
+import { Timeline } from '../flow/TimelineView'
 import { libraryDrills } from '../library/drills'
 import { Player } from '../player/Player'
 import { ActorPanel } from './ActorPanel'
@@ -221,6 +222,7 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
         <Player drill={result.drill} />
       ) : (
         <div className="editor">
+          <div className="stage-col">
           <EditStage
             drill={drill}
             step={step}
@@ -296,6 +298,8 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
             }}
             onVertexDragEnd={editor.endGesture}
           />
+            <Timeline drill={drill} />
+          </div>
           <aside className="panels">
             {selectedActor && <ActorPanel key={selectedActor.id} drill={drill} actor={selectedActor} onEdit={editor.edit} />}
             {selection?.kind === 'route' && selectedMove && (

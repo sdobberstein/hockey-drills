@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { buildTimeline, stepIndexAt } from '../engine/timeline'
 import type { Drill } from '../engine/types'
+import { Timeline } from '../flow/TimelineView'
 import { DrillView } from '../render/DrillView'
 import { Controls } from './Controls'
 import { usePlayback } from './usePlayback'
@@ -16,6 +17,7 @@ export function Player({ drill }: { drill: Drill }) {
     <div className="player">
       <DrillView drill={drill} plan={timeline.plan} frame={timeline.at(playback.time)} activeStep={activeStep} />
       <Controls plan={timeline.plan} playback={playback} activeStep={activeStep} />
+      <Timeline drill={drill} time={playback.time} onSeek={playback.seek} />
     </div>
   )
 }
