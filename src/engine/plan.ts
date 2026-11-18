@@ -75,14 +75,7 @@ export interface Plan {
  * (known actor ids, etc.); it does not re-check them.
  */
 export function planDrill(drill: Drill): Plan {
-  const positions = new Map<string, Point>(drill.actors.map((a) => [a.id, a.start]))
-  const carriers = new Map<string, string>()
-  for (const actor of drill.actors) {
-    if (actor.carriedBy) carriers.set(actor.id, actor.carriedBy)
-  }
-  // A carried actor ignores its own `start` and sits on its carrier, so the
-  // two can never disagree about where the puck is.
-  syncCarried(positions, carriers)
+  const { positions, carriers } = initialState(drill)
 
   const steps: PlannedStep[] = []
   let clock = 0
@@ -131,6 +124,24 @@ export function planDrill(drill: Drill): Plan {
   }
 
   return { duration: clock, steps }
+}
+
+/**
+ * Who is where, and who carries whom, before any step runs.
+ *
+ * A carried actor ignores its own `start` and sits on its carrier, so the two
+ * can never disagree about where the puck is. Exported because an editor needs
+ * the opening picture of a drill that may not have any steps yet, which
+ * Timeline.at(0) cannot give it.
+ */
+export function initialState(drill: Drill): { positions: Map<string, Point>; carriers: Map<string, string> } {
+  const positions = new Map<string, Point>(drill.actors.map((a) => [a.id, a.start]))
+  const carriers = new Map<string, string>()
+  for (const actor of drill.actors) {
+    if (actor.carriedBy) carriers.set(actor.id, actor.carriedBy)
+  }
+  syncCarried(positions, carriers)
+  return { positions, carriers }
 }
 
 function resolveTarget(to: string | Point, positions: ReadonlyMap<string, Point>): Point {

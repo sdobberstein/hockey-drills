@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { twoOnOne } from './fixtures'
-import { planDrill } from './plan'
+import { initialState, planDrill } from './plan'
 
 const len = (a: readonly [number, number], b: readonly [number, number]) =>
   Math.hypot(b[0] - a[0], b[1] - a[1])
@@ -65,5 +65,18 @@ describe('planDrill with a smoothed path', () => {
   it('does not change a straight move that names a target', () => {
     const toMove = { ...corner, steps: [{ moves: [{ actor: 'puck', style: 'shoot' as const, to: [189, 42] as [number, number], smooth: true }] }] }
     expect(planDrill(toMove).steps[0].moves[0].path).toHaveLength(2)
+  })
+})
+
+describe('initialState', () => {
+  it('puts a carried puck on its carrier, ignoring the puck\'s own start', () => {
+    const drill = { ...twoOnOne, actors: twoOnOne.actors.map((a) => (a.id === 'puck' ? { ...a, start: [10, 10] as [number, number] } : a)) }
+    const { positions, carriers } = initialState(drill)
+    expect(positions.get('puck')).toEqual([95, 25])
+    expect(carriers.get('puck')).toBe('F1')
+  })
+
+  it('works for a drill that has no steps yet', () => {
+    expect(initialState({ ...twoOnOne, steps: [] }).positions.get('F2')).toEqual([95, 60])
   })
 })
