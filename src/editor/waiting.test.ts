@@ -131,3 +131,38 @@ describe('extendRoute', () => {
     expect(extendRoute(reported, 9, 'F2')).toBe(reported)
   })
 })
+
+describe('a skater who stands through a whole step', () => {
+  // Make the shot slow enough that the step is long enough to notice.
+  const slowShot = (): Drill => {
+    const d = clone(reported)
+    d.steps[2].moves[0] = { actor: 'puck', style: 'shoot', speed: 30, to: [9.4, 42.1] }
+    return d
+  }
+
+  it('is reported for a skater who moved in the step before', () => {
+    const still = findWaits(slowShot()).filter((w) => w.kind === 'still')
+    expect(still.map((w) => w.actor).sort()).toEqual(['F1', 'F2'])
+    expect(still[0].step).toBe(2)
+  })
+
+  it('is not reported for a step too short to notice', () => {
+    expect(findWaits(reported).some((w) => w.kind === 'still')).toBe(false)
+  })
+
+  it('keeps them going the way they were heading', () => {
+    const fixed = continueSkating(slowShot(), 2, 'F2')
+    const route = findRoute(fixed, 2, 'F2')!
+    expect(route.style).toBe('skate-puck') // F2 has the puck by then
+    const [a, b] = route.points
+    expect(b[0]).toBeLessThan(a[0]) // still heading toward the net, as in step 2
+    expect(validateDrill(fixed)).toEqual([])
+    expect(findWaits(fixed).some((w) => w.actor === 'F2' && w.kind === 'still')).toBe(false)
+  })
+
+  it('does nothing for someone who did not skate before, or in a step with no length', () => {
+    const d = slowShot()
+    expect(continueSkating(d, 0, 'F2')).toBe(d)
+    expect(continueSkating(d, 2, 'puck')).toBe(d)
+  })
+})
