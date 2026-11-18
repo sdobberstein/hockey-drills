@@ -44,6 +44,8 @@ export interface PlannedMove {
 }
 
 export interface PlannedStep {
+  /** Carried over from the drill so the UI can label the step. */
+  name?: string
   /** Seconds from the start of the drill. */
   start: number
   /** Seconds: the slowest move in the step. */
@@ -114,7 +116,7 @@ export function planDrill(drill: Drill): Plan {
     syncCarried(positions, carriers)
 
     const duration = Math.max(0, ...moves.map((m) => m.duration))
-    steps.push({ start: clock, duration, moves, before, after: snapshot(positions, carriers) })
+    steps.push({ name: step.name, start: clock, duration, moves, before, after: snapshot(positions, carriers) })
     clock += duration
   }
 

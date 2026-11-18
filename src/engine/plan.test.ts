@@ -8,8 +8,8 @@ const len = (a: readonly [number, number], b: readonly [number, number]) =>
 describe('planDrill (2-on-1)', () => {
   const plan = planDrill(twoOnOne)
 
-  it('makes one planned step per step', () => {
-    expect(plan.steps).toHaveLength(4)
+  it('makes one planned step per step, keeping its name', () => {
+    expect(plan.steps.map((s) => s.name)).toEqual(['Attack', 'Pass', 'Walk in', 'Shot'])
   })
 
   it('lasts as long as the slowest move in each step', () => {
