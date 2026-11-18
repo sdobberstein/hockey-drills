@@ -1,7 +1,8 @@
-import { distance } from './geometry'
-import { planDrill } from './plan'
+import { distance, nearestAlongPath, pathLength } from './geometry'
+import { planDrill, type PlannedMove } from './plan'
+import { landingSpot } from './receive'
 import { buildTimeline } from './timeline'
-import type { Drill } from './types'
+import type { Drill, Point } from './types'
 
 /**
  * Semantic validation: the rules a JSON Schema cannot express because they
@@ -22,6 +23,19 @@ export interface Issue {
   message: string
   /** Where in the drill, e.g. "steps[2].moves[0]". */
   location: string
+  /** Machine-readable fix, when we can work one out (see receiver-misses-pass). */
+  suggestion?: Suggestion
+}
+
+/**
+ * Concrete changes that would fix an issue. Either one alone is enough; they
+ * are alternatives, not a pair. An editor could apply one with a click.
+ */
+export interface Suggestion {
+  /** Straight passes only: land here, where puck and receiver can arrive together. */
+  landAt?: Point
+  /** Or change the pass speed (ft/s) so the puck arrives as the receiver reaches the landing spot. */
+  passSpeed?: number
 }
 
 export type IssueCode =
@@ -164,10 +178,14 @@ function checkState(drill: Drill): Issue[] {
           const lands = move.path[move.path.length - 1]
           const there = timeline.at(step.start + move.duration)[move.receiver]
           if (distance(there, lands) > RECEIVE_TOLERANCE) {
+            const suggestion = suggestFix(step.moves, move, there, lands)
             issues.push({
               code: 'receiver-misses-pass',
-              message: `The ${move.style} lands at [${fmt(lands)}] after ${move.duration.toFixed(2)}s, but "${move.receiver}" is at [${fmt(there)}] then. Adjust the pass target, speed, or the receiver's route.`,
+              message:
+                `The ${move.style} lands at [${fmt(lands)}] after ${move.duration.toFixed(2)}s, but "${move.receiver}" is at [${fmt(there)}] then.` +
+                describe(suggestion, move.receiver, lands),
               location,
+              suggestion,
             })
           }
         }
@@ -185,3 +203,43 @@ function checkState(drill: Drill): Issue[] {
 }
 
 const fmt = (p: readonly [number, number]) => p.map((n) => n.toFixed(1)).join(', ')
+
+/**
+ * Work out what would make a missed pass land on its receiver.
+ *
+ * Two independent fixes, because they suit different situations:
+ *  - if the receiver's route already passes through the landing spot, change
+ *    the pass speed so the puck arrives at the moment the receiver does. We
+ *    find how far along their route the landing spot is, divide by their
+ *    speed to get a time, then pick the speed that covers the pass in that
+ *    time. Works for any pass, including a bank off the boards.
+ *  - for a straight pass, move the landing spot to where puck and receiver
+ *    can arrive together (see landingSpot). We do not offer this for a pass
+ *    that bends, because moving its end would leave the bend pointing the
+ *    wrong way and we cannot guess how the author wants it reshaped.
+ */
+function suggestFix(moves: readonly PlannedMove[], pass: PlannedMove, there: Point, lands: Point): Suggestion {
+  const suggestion: Suggestion = {}
+  const route = moves.find((m) => m.actor === pass.receiver)
+
+  if (route) {
+    const onRoute = nearestAlongPath(route.path, lands)
+    if (onRoute.distance <= RECEIVE_TOLERANCE && onRoute.arc > 0) {
+      suggestion.passSpeed = pathLength(pass.path) / (onRoute.arc / route.speed)
+    }
+  }
+  if (pass.path.length === 2) {
+    suggestion.landAt = landingSpot(pass.path[0], pass.speed, route?.path, route?.speed ?? 1, there)
+  }
+  return suggestion
+}
+
+function describe(suggestion: Suggestion, receiver: string, lands: Point): string {
+  const parts: string[] = []
+  if (suggestion.passSpeed !== undefined) {
+    parts.push(`set the pass speed to ${suggestion.passSpeed.toFixed(1)} ft/s so it arrives as ${receiver} reaches [${fmt(lands)}]`)
+  }
+  if (suggestion.landAt) parts.push(`land the pass at [${fmt(suggestion.landAt)}], where ${receiver} can meet it`)
+  if (parts.length === 0) return ' Adjust the pass target, speed, or the receiver\'s route.'
+  return ` To fix: ${parts.join(', or ')}.`
+}

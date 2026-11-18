@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clone, twoOnOne } from './fixtures'
+import { clone, cycleGiveAndGo, twoOnOne } from './fixtures'
 import type { Drill } from './types'
 import { validateDrill, type IssueCode } from './validate'
 
@@ -113,5 +113,55 @@ describe('validateDrill', () => {
     const d = clone(twoOnOne)
     d.steps[0].moves.push({ actor: 'puck', style: 'skate', points: [[95, 25], [100, 25]] })
     expect(codes(d)).toContain('carried-actor-moves')
+  })
+
+  describe('suggestions for a missed pass', () => {
+    // The bank pass in Cycle Give and Go is timed for 30 ft/s. Make it too
+    // fast, so the puck beats F2 to the landing spot.
+    const tooFast = () => {
+      const d = clone(cycleGiveAndGo)
+      const pass = d.steps[1].moves[0]
+      pass.speed = 45
+      return d
+    }
+
+    it('suggests a pass speed that makes the receiver arrive with the puck', () => {
+      const issue = validateDrill(tooFast()).find((i) => i.code === 'receiver-misses-pass')!
+      expect(issue.suggestion?.passSpeed).toBeCloseTo(30, 0)
+      expect(issue.message).toContain('To fix:')
+
+      // Applying the suggestion should clear the problem.
+      const fixed = tooFast()
+      fixed.steps[1].moves[0].speed = issue.suggestion!.passSpeed
+      expect(validateDrill(fixed)).toEqual([])
+    })
+
+    it('suggests a landing spot for a straight pass, and it works', () => {
+      // A straight pass from the same release point, at the same too-fast speed.
+      const straight = () => {
+        const d = tooFast()
+        d.steps[1].moves[0] = { actor: 'puck', style: 'pass', speed: 45, to: [172, 80], receiver: 'F2' }
+        return d
+      }
+      const issue = validateDrill(straight()).find((i) => i.code === 'receiver-misses-pass')!
+      expect(issue.suggestion?.landAt).toBeDefined()
+
+      const fixed = straight()
+      fixed.steps[1].moves[0] = { actor: 'puck', style: 'pass', speed: 45, to: issue.suggestion!.landAt!, receiver: 'F2' }
+      expect(validateDrill(fixed)).toEqual([])
+    })
+
+    it('does not suggest moving the end of a pass that bends', () => {
+      const issue = validateDrill(tooFast()).find((i) => i.code === 'receiver-misses-pass')!
+      expect(issue.suggestion?.landAt).toBeUndefined() // the bank has three points
+    })
+
+    it('offers only the landing spot when the receiver never reaches it', () => {
+      const d = clone(twoOnOne)
+      d.steps[1].moves.push({ actor: 'F2', style: 'skate', points: [[155, 58], [175, 58]] })
+      const issue = validateDrill(d).find((i) => i.code === 'receiver-misses-pass')!
+      expect(issue.suggestion?.landAt).toBeDefined()
+      expect(issue.suggestion?.passSpeed).toBeUndefined()
+    })
   })
 })
