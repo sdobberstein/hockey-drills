@@ -1,4 +1,4 @@
-import { pathLength } from './geometry'
+import { pathLength, smoothPath } from './geometry'
 import type { Drill, MoveStyle, Point } from './types'
 
 /**
@@ -92,9 +92,15 @@ export function planDrill(drill: Drill): Plan {
 
     const moves: PlannedMove[] = step.moves.map((move) => {
       const from = before.positions.get(move.actor)!
+      // `smooth` rounds a multi-point path into a curve through the same
+      // points. Doing it here, once, means the duration (length / speed), the
+      // playback position and the drawn line all follow the curve. It only
+      // applies to `points` paths; a `to` move is a single straight leg.
       const path: readonly Point[] =
         'points' in move && move.points
-          ? move.points
+          ? move.smooth
+            ? smoothPath(move.points)
+            : move.points
           : [from, resolveTarget(move.to!, before.positions)]
       const speed = move.speed ?? DEFAULT_SPEEDS[move.style]
       const releases = RELEASING_STYLES.has(move.style)

@@ -86,7 +86,7 @@
           "description": "Target actor id or a point.",
           "oneOf": [{ "type": "string" }, { "$ref": "#/$defs/point" }]
         },
-        "smooth": { "type": "boolean", "default": false, "description": "Reserved; ignored in v1." },
+        "smooth": { "type": "boolean", "default": false, "description": "Round a `points` path into a smooth curve through the same points. Ignored for `to` moves." },
         "receiver": {
           "type": "string",
           "description": "Actor that picks the puck up when a release ends. Implied when `to` is an actor id."

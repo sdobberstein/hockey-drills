@@ -58,7 +58,10 @@ interface MoveBase {
   style: MoveStyle
   /** Feet per second. Falls back to DEFAULT_SPEEDS[style]. */
   speed?: number
-  /** Reserved for curved paths; ignored in v1. */
+  /**
+   * Round a `points` path into a smooth curve through the same points.
+   * Ignored for `to` moves, which are a single straight leg.
+   */
   smooth?: boolean
   /**
    * Actor that picks the puck up when this release (pass, shot, drop-pass)
