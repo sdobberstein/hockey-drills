@@ -7,12 +7,18 @@ import {
   carrierAt,
   deleteMove,
   findMove,
+  MAX_PASS_SPEED,
+  MIN_PASS_SPEED,
+  passesTiedToRunEnd,
   RELEASE_STYLES,
+  reshapeRoute,
   retimePass,
   setLanding,
+  tieToRunEnd,
   updateRelease,
 } from './releases'
-import { addRoute } from './routes'
+import { buildTimeline } from '../engine/timeline'
+import { addRoute, findRoute } from './routes'
 
 /**
  * After "Attack": F1 (150,28) carries the puck, F2 waits at (155,58), and
@@ -190,5 +196,72 @@ describe('applySuggestion', () => {
     const d = tooFast()
     expect(applySuggestion(d, 'somewhere', { passSpeed: 20 })).toBe(d)
     expect(applySuggestion(d, 'steps[9].moves[0]', { passSpeed: 20 })).toBe(d)
+  })
+})
+
+describe('tieToRunEnd: the pass lands where the receiver\'s run ends', () => {
+  /** F2 runs 30 ft along the boards while F1 passes to them. */
+  const aimedAtF2 = () => {
+    let d = addRelease(base(), 1, 'puck', 'pass', { kind: 'actor', id: 'F2' })
+    d = addRoute(d, 1, 'F2', 'skate', [[155, 58], [185, 58]])
+    return d
+  }
+
+  it('lands exactly at the end of F2\'s run', () => {
+    const d = tieToRunEnd(aimedAtF2(), 1, 'puck')
+    expect(findMove(d, 1, 'puck')).toMatchObject({ to: [185, 58], receiver: 'F2' })
+  })
+
+  it('sets the pass speed so the puck arrives as F2 does, and the drill validates', () => {
+    const d = tieToRunEnd(aimedAtF2(), 1, 'puck')
+    expect(validateDrill(d)).toEqual([])
+    const step = buildTimeline(d).plan.steps[1]
+    const pass = step.moves.find((m) => m.actor === 'puck')!
+    const run = step.moves.find((m) => m.actor === 'F2')!
+    expect(Math.abs(pass.duration - run.duration)).toBeLessThan(0.03)
+  })
+
+  it('falls back to meeting along the run when the speed needed is not believable', () => {
+    // A 1 ft run: matching it would need a pass faster than any shot.
+    let d = addRelease(base(), 1, 'puck', 'pass', { kind: 'actor', id: 'F2' })
+    d = addRoute(d, 1, 'F2', 'skate', [[155, 58], [156, 58]])
+    const tied = tieToRunEnd(d, 1, 'puck')
+    const speed = findMove(tied, 1, 'puck')!.speed
+    expect(speed === undefined || (speed >= MIN_PASS_SPEED && speed <= MAX_PASS_SPEED)).toBe(true)
+  })
+
+  it('leaves a receiver who stands still, a bank, and a pass with no receiver alone', () => {
+    const still = addRelease(base(), 1, 'puck', 'pass', { kind: 'actor', id: 'F2' })
+    expect(tieToRunEnd(still, 1, 'puck')).toBe(still)
+    const none = addRelease(base(), 1, 'puck', 'shoot', { kind: 'point', at: [189, 42] })
+    expect(tieToRunEnd(none, 1, 'puck')).toBe(none)
+  })
+})
+
+describe('passes follow the run they are tied to', () => {
+  const tied = () => {
+    let d = addRelease(base(), 1, 'puck', 'pass', { kind: 'actor', id: 'F2' })
+    d = addRoute(d, 1, 'F2', 'skate', [[155, 58], [185, 58]])
+    return tieToRunEnd(d, 1, 'puck')
+  }
+
+  it('knows which passes land at the end of a run', () => {
+    expect(passesTiedToRunEnd(tied(), 1, 'F2')).toEqual(['puck'])
+    const aimedAtStart = addRoute(addRelease(base(), 1, 'puck', 'pass', { kind: 'actor', id: 'F2' }), 1, 'F2', 'skate', [[155, 58], [185, 58]])
+    expect(passesTiedToRunEnd(aimedAtStart, 1, 'F2')).toEqual([])
+  })
+
+  it('moves the landing with the end of the run, and the drill stays valid', () => {
+    const d = reshapeRoute(tied(), 1, 'F2', [[155, 58], [180, 50]])
+    expect(findRoute(d, 1, 'F2')!.points[1]).toEqual([180, 50])
+    expect(findMove(d, 1, 'puck')).toMatchObject({ to: [180, 50], receiver: 'F2' })
+    expect(validateDrill(d)).toEqual([])
+  })
+
+  it('does not move a pass that was not tied to the run', () => {
+    const d = addRelease(base(), 1, 'puck', 'pass', { kind: 'point', at: [160, 55] }, 'F2')
+    const withRun = addRoute(d, 1, 'F2', 'skate', [[155, 58], [185, 58]])
+    const reshaped = reshapeRoute(withRun, 1, 'F2', [[155, 58], [180, 50]])
+    expect(findMove(reshaped, 1, 'puck')!.to).toEqual([160, 55])
   })
 })

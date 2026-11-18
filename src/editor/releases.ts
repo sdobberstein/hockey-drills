@@ -1,9 +1,10 @@
+import { distance } from '../engine/geometry'
 import { landingSpot } from '../engine/receive'
 import { planDrill, RELEASING_STYLES } from '../engine/plan'
 import type { Drill, Move, MoveStyle, Point, TargetMove } from '../engine/types'
-import type { Suggestion } from '../engine/validate'
+import { RECEIVE_TOLERANCE, type Suggestion } from '../engine/validate'
 import { clampToRink } from './rink'
-import { reanchor } from './routes'
+import { reanchor, setRoutePoints } from './routes'
 
 /**
  * Editing the puck's releases: passes, shots and drop passes. Like routes.ts
@@ -198,5 +199,82 @@ export function applySuggestion(drill: Drill, location: string, suggestion: Sugg
   } else if (suggestion.landAt) {
     next = setLanding(next, step, move.actor, suggestion.landAt)
   }
+  return next
+}
+
+/** Pass speeds outside this range (ft/s) are not believable, so the editor will not choose them. */
+export const MIN_PASS_SPEED = 20
+export const MAX_PASS_SPEED = 110
+
+/**
+ * Land a pass at the end of the receiver's run, and set the pass speed so the
+ * puck arrives exactly when they get there.
+ *
+ * This is how a coach thinks about it: "F2 skates here, and the pass meets them
+ * there". Nothing about where along the run to aim; the speed does the timing.
+ * F2's next step begins the moment the step ends, which is the moment the puck
+ * arrives, so F2 skates straight through instead of stopping.
+ *
+ * Falls back to meeting the receiver along their run at the pass's current
+ * speed (retimePass) when the speed that would be needed is not believable,
+ * for example a very short run. A receiver who does not move, a bank, or a
+ * move with no receiver is left alone.
+ */
+export function tieToRunEnd(drill: Drill, step: number, actor: string): Drill {
+  const move = findMove(drill, step, actor)
+  if (!move || !isRelease(move) || (move.points && move.points.length > 2)) return drill
+  const receiver = move.receiver ?? (typeof move.to === 'string' ? move.to : undefined)
+  if (receiver === undefined) return drill
+
+  let plan
+  try {
+    plan = planDrill(drill)
+  } catch {
+    return drill
+  }
+  const planned = plan.steps[step]
+  const pass = planned?.moves.find((m) => m.actor === actor)
+  const run = planned?.moves.find((m) => m.actor === receiver)
+  if (!planned || !pass || !run) return drill // a receiver who stands still is just aimed at
+
+  const end = run.path[run.path.length - 1]
+  const speed = run.duration > 0 ? Math.round((distance(pass.path[0], end) / run.duration) * 10) / 10 : 0
+  if (!(speed >= MIN_PASS_SPEED && speed <= MAX_PASS_SPEED)) return retimePass(drill, step, actor)
+
+  return withMove(drill, step, actor, (m) => {
+    const { points: _path, to: _to, ...rest } = m
+    return { ...rest, to: clampToRink(end), receiver, speed } as Move
+  })
+}
+
+/**
+ * The passes in a step that currently land at the end of this actor's run,
+ * within the receiving tolerance. Those are the ones that should follow the
+ * run if it is reshaped, with no stored flag needed: the geometry says so.
+ */
+export function passesTiedToRunEnd(drill: Drill, step: number, actor: string): string[] {
+  let plan
+  try {
+    plan = planDrill(drill)
+  } catch {
+    return []
+  }
+  const planned = plan.steps[step]
+  const run = planned?.moves.find((m) => m.actor === actor)
+  if (!planned || !run) return []
+  const end = run.path[run.path.length - 1]
+  return planned.moves
+    .filter((m) => m.releases && m.receiver === actor && distance(m.path[m.path.length - 1], end) <= RECEIVE_TOLERANCE)
+    .map((m) => m.actor)
+}
+
+/**
+ * Reshape a route, and keep any pass that was landing at the end of that run
+ * landing there, re-timed. Dragging the end of F2's run drags the pass with it.
+ */
+export function reshapeRoute(drill: Drill, step: number, actor: string, points: readonly Point[]): Drill {
+  const tied = passesTiedToRunEnd(drill, step, actor)
+  let next = setRoutePoints(drill, step, actor, points)
+  for (const puck of tied) next = tieToRunEnd(next, step, puck)
   return next
 }
