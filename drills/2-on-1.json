@@ -2,10 +2,10 @@
   "version": 1,
   "id": "2-on-1",
   "title": "2-on-1 Rush",
-  "description": "Two forwards attack one defender: carry, pass across, walk in, shoot.",
+  "description": "Two forwards attack one defender. F1 carries the puck and passes across to F2 in stride, and F2 shoots without breaking stride.",
   "tags": ["rush", "offence"],
   "rink": "full",
-  "progression": { "series": "two-on-one", "order": 2 },
+  "progression": { "series": "two-on-one", "order": 1 },
   "actors": [
     { "id": "F1", "type": "forward", "start": [95, 25] },
     { "id": "F2", "type": "forward", "start": [95, 60] },
@@ -15,23 +15,31 @@
   "steps": [
     {
       "name": "Attack",
+      "notes": "F1 carries up the ice, F2 stays wide, D backs in.",
       "moves": [
-        { "actor": "F1", "style": "skate-puck", "speed": 25, "points": [[95, 25], [150, 28]] },
-        { "actor": "F2", "style": "skate", "speed": 25, "points": [[95, 60], [155, 58]] },
-        { "actor": "D", "style": "backward", "speed": 12, "points": [[140, 42], [150, 38]] }
+        { "actor": "F1", "style": "skate-puck", "speed": 22, "points": [[95, 25], [138, 28]] },
+        { "actor": "F2", "style": "skate", "speed": 25, "points": [[95, 60], [143.1, 54.9]] },
+        { "actor": "D", "style": "backward", "speed": 6.8, "points": [[140, 42], [152, 36]] }
       ]
     },
     {
-      "name": "Pass",
-      "moves": [{ "actor": "puck", "style": "pass", "speed": 60, "to": "F2" }]
-    },
-    {
-      "name": "Walk in",
-      "moves": [{ "actor": "F2", "style": "skate-puck", "speed": 15, "points": [[155, 58], [165, 55]] }]
+      "name": "Pass in stride",
+      "notes": "F1 passes across to a spot ahead of F2, who picks it up without slowing down. F1 keeps driving.",
+      "moves": [
+        { "actor": "puck", "style": "pass", "speed": 60, "to": [155, 52], "receiver": "F2" },
+        { "actor": "F1", "style": "skate", "speed": 22, "points": [[138, 28], [155, 28]] },
+        { "actor": "F2", "style": "skate-puck", "speed": 25, "points": [[143.1, 54.9], [155, 52], [165, 52]] },
+        { "actor": "D", "style": "backward", "speed": 6.8, "points": [[152, 36], [157, 34]] }
+      ]
     },
     {
       "name": "Shot",
-      "moves": [{ "actor": "puck", "style": "shoot", "speed": 80, "to": [189, 42] }]
+      "notes": "F2 shoots in stride; F1 crashes the net.",
+      "moves": [
+        { "actor": "puck", "style": "shoot", "speed": 90, "to": [189, 42] },
+        { "actor": "F2", "style": "skate", "speed": 25, "points": [[165, 52], [172, 50]] },
+        { "actor": "F1", "style": "skate", "speed": 22, "points": [[155, 28], [162, 30]] }
+      ]
     }
   ]
 }
