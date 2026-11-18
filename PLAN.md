@@ -125,7 +125,23 @@ The viewer comes before the editor so the model can be judged with hand-written 
 
 ## Deferred / revisit
 
-- Path smoothing (`smooth` flag; renderer and path-length only).
 - Progression inheritance via `extends` (additive; existing files stay valid).
 - IIHF rink size.
 - GIF export.
+- Queues of waiting players and rep rotation (the source diagrams show a pile of players per line).
+- Smoothing of `to` moves (only `points` paths are smoothed).
+
+## Authoring helpers for passes in stride
+
+A pass in stride ties four numbers together: where the puck leaves (the carrier's position at the start of the step), the landing spot, the pass speed (which fixes how long the puck is in the air), and where the receiver is at that moment (their route and speed). Written by hand, you work backwards: pass length / pass speed = time in the air; receiver speed x that time = distance the receiver must have covered; so the receiver must start the step that far before the landing spot, which in turn sizes the paths in the previous step. Change one number and the rest must be redone.
+
+Three levels of help, each building on the one before:
+
+1. **Validator hints** (built). When `receiver-misses-pass` fires, the issue also carries a `suggestion` (a landing spot that would work, and a pass speed that would work when the receiver's route already passes through the landing spot) and the message says so.
+2. **Solver functions in the engine** (not built). Pure, tested functions that answer the question directly instead of after a failed validation:
+   - given the passer, landing spot, pass speed and the receiver's route and speed, where must the receiver be at the start of the step?
+   - given the receiver's start, route and speed, what pass speed lines up, or where must the pass land?
+   This is the working-backwards arithmetic above, made reusable. The editor would call it, and so could a CLI that adjusts a hand-written drill.
+3. **Editor snapping** (not built; belongs to build step 4, the editor). Drag the landing spot or the receiver's route and the timing adjusts automatically: the receiver's start of the pass step, or the pass speed, is re-solved so the pass keeps landing on them. The author edits positions, never timing numbers. Open question: which quantity should the editor hold fixed when something moves (pass speed, the receiver's start, or the landing spot); a sensible default is to keep speeds fixed and move positions, with an override.
+
+Related, if hand-computed timing keeps hurting: because steps are sync points, an actor's path often has to be split across steps at one speed. The editor could present a single continuous path per actor and split it at step boundaries itself.
