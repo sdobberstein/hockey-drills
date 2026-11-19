@@ -2,7 +2,7 @@
   "version": 1,
   "id": "boston-college-warm-up",
   "title": "Boston College Warm Up",
-  "description": "A half-ice warm-up drill with a line of skaters at the top boards and another at the bottom, between the blue line and the red line. The first player in the top line skates backward toward the hash marks of the end-zone faceoff circle, one-touching passes back to the next player in line, who stays put. At the hash marks they turn and skate forward toward the blue line, passing to the next player on the way. At the blue line they pivot and skate toward the bottom, while the next player passes across the ice to the front player of the other line, who holds it. The first player goes around the bottom faceoff dot and curves in across the blue line, gets the pass from the front player as they curve, and shoots from about the hash marks. Then the front player of the bottom line starts the drill the same way, and the lines alternate.",
+  "description": "A half-ice warm-up drill with a line of skaters at the top boards and another at the bottom, between the blue line and the red line. The first player in the top line skates backward toward the hash marks of the end-zone faceoff circle, one-touching passes back to the next player in line, who stays put. At the hash marks they turn and skate forward toward the blue line, passing to the next player on the way. At the blue line they pivot and skate toward the bottom, while the next player passes across the ice to the front player of the other line, who holds it. The first player goes around the bottom faceoff dot and curves in across the blue line, gets the pass from the front player as they curve, skates in to at least the top of the circle, and shoots from about the hash marks. Then the front player of the bottom line starts the drill the same way, and the lines alternate.",
   "tags": [
     "warm up",
     "passing",
@@ -180,7 +180,7 @@
       "moves": [
         {
           "actor": "T1",
-          "style": "skate",
+          "style": "skate-puck",
           "points": [[66.00000000000003, 59.50000000000002], [65.2636005620136, 58.907529169031406], [64.52483974746427, 58.295681579954184], [64.37854987623611, 58.17188719333886]],
           "speed": 24
         },
@@ -189,17 +189,16 @@
           "style": "backward",
           "points": [[73.34136993904964, 80.71665403995956], [72.20705244267167, 80.66838521032645]],
           "speed": 13
-        },
-        { "actor": "puckA", "style": "shoot", "to": [58.49046450214982, 57.17887084611905] }
+        }
       ],
-      "name": "Catch and shoot",
-      "notes": "They get the pass in stride as they curve in across the blue line, and shoot from about the hash marks."
+      "name": "Catch and skate in",
+      "notes": "They get the pass in stride as they curve in across the blue line, and keep skating in, to at least the top of the circle."
     },
     {
       "moves": [
         {
           "actor": "T1",
-          "style": "skate",
+          "style": "skate-puck",
           "points": [[64.37854987623611, 58.17188719333886], [63.7836841204838, 57.66849594189013], [63.04010024520396, 57.03001096396102], [62.29405468575651, 56.38426535528863], [61.54551400627323, 55.73529782499476], [60.79444477088587, 55.08714708220118], [60.04081354372622, 54.443851836029665], [59.284586888926036, 53.80945079560201], [58.553064890550836, 53.210367578614004]],
           "speed": 24
         },
@@ -215,15 +214,14 @@
           "to": [68.06580624938272, 80.49216196805884],
           "speed": 50,
           "receiver": "B1"
-        },
-        { "actor": "puckA", "style": "shoot", "to": [31.074123492562222, 48.70472907951924], "continues": true }
+        }
       ]
     },
     {
       "moves": [
         {
           "actor": "T1",
-          "style": "skate",
+          "style": "skate-puck",
           "points": [[58.553064890550836, 53.210367578614004], [58.525731370617095, 53.18798267003999], [57.76421355293116, 52.5834861684654], [57, 52], [56.193095777636536, 51.407613287629914], [55.37856928773931, 50.82809072064286], [54.55820944643171, 50.26027306170555], [53.73380516983707, 49.70300107348465], [52.90714537407875, 49.155115518646866], [52.32256024328837, 48.77370313389838]],
           "speed": 24
         },
@@ -233,15 +231,14 @@
           "points": [[68.06580624938272, 80.49216196805884], [63.92456005609378, 80.31593872579123]],
           "speed": 13
         },
-        { "actor": "puckB", "style": "pass", "to": [84, 81], "speed": 50, "receiver": "B2" },
-        { "actor": "puckA", "style": "shoot", "to": [11, 42.5], "continues": true }
+        { "actor": "puckB", "style": "pass", "to": [84, 81], "speed": 50, "receiver": "B2" }
       ]
     },
     {
       "moves": [
         {
           "actor": "T1",
-          "style": "skate",
+          "style": "skate-puck",
           "points": [[52.32256024328837, 48.77370313389838], [52.08001897528014, 48.61545715985887], [51.254214889564565, 48.08286675978737], [50.4315220330554, 47.556185081099045], [49.61372932187602, 47.034252886460585], [48.802625672149766, 46.51591093853867], [48, 46], [47.18415370719632, 45.47639721963829], [46.3749589447053, 44.962701779181494], [45.57124191305999, 44.457165324528745], [44.77182881279346, 43.95803950157918], [43.97554584443877, 43.46357595623192], [43.18121920852897, 42.972026334386115], [42.38767510559714, 42.48164228194089], [41.593739736176325, 41.99067544479537], [41.30834753812565, 41.81370081676428]],
           "speed": 24
         },
@@ -264,18 +261,32 @@
       "moves": [
         {
           "actor": "T1",
-          "style": "skate",
+          "style": "skate-puck",
           "points": [[41.30834753812565, 41.81370081676428], [40.79823930079959, 41.4973774688487], [40.00000000000001, 41.00000000000001]],
           "speed": 24
         },
         {
           "actor": "B1",
           "style": "backward",
-          "points": [[56.87338037524034, 80.01588852660598], [56.5, 80], [49.82220069438687, 79.71583832742071]],
+          "points": [[56.87338037524034, 80.01588852660598], [56.5, 80], [56.03956655004883, 79.98040708723612]],
           "speed": 13
         },
-        { "actor": "puckB", "style": "pass", "to": [84, 81], "speed": 50, "receiver": "B2" }
+        { "actor": "puckB", "style": "pass", "to": [60.081148649144005, 80.13226135912274], "speed": 50 }
       ]
+    },
+    {
+      "moves": [
+        {
+          "actor": "B1",
+          "style": "backward",
+          "points": [[56.03956655004883, 79.98040708723612], [49.82220069438687, 79.71583832742071]],
+          "speed": 13
+        },
+        { "actor": "puckB", "style": "pass", "to": [84, 81], "speed": 50, "receiver": "B2", "continues": true },
+        { "actor": "puckA", "style": "shoot", "to": [11, 42.5] }
+      ],
+      "name": "Shoot",
+      "notes": "They shoot from about the hash marks."
     },
     {
       "moves": [
@@ -354,14 +365,20 @@
       "moves": [
         {
           "actor": "B1",
-          "style": "skate",
+          "style": "skate-puck",
           "points": [[66.00000000000003, 25.499999999999975], [65.2636005620136, 26.092470830968598], [64.52483974746427, 26.704318420045816], [63.7836841204838, 27.33150405810987], [63.04010024520396, 27.96998903603898], [62.29405468575651, 28.615734644711363], [61.54551400627323, 29.26470217500524], [60.79444477088587, 29.912852917798823], [60.04081354372622, 30.556148163970335], [59.284586888926036, 31.19054920439799], [58.525731370617095, 31.812017329960003], [57.76421355293116, 32.4165138315346], [57, 33], [56.193095777636536, 33.592386712370086], [55.37856928773931, 34.17190927935714], [54.55820944643171, 34.73972693829445], [53.73380516983707, 35.29699892651535], [52.90714537407875, 35.844884481353134], [52.08001897528014, 36.38454284014113], [51.254214889564565, 36.91713324021263], [50.4315220330554, 37.443814918900955], [49.61372932187602, 37.965747113539415], [48.802625672149766, 38.48408906146133], [48, 39], [47.18415370719632, 39.52360278036171], [46.3749589447053, 40.037298220818506], [45.57124191305999, 40.542834675471255], [44.77182881279346, 41.04196049842082], [43.97554584443877, 41.53642404376808], [43.18121920852897, 42.027973665613885], [42.38767510559714, 42.51835771805911], [41.593739736176325, 43.00932455520463], [40.79823930079959, 43.5026225311513], [40.00000000000002, 43.999999999999986]],
           "speed": 24
-        },
+        }
+      ],
+      "name": "Catch and skate in (bottom line)",
+      "notes": "They get the pass in stride as they curve in across the blue line, and keep skating in, to at least the top of the circle."
+    },
+    {
+      "moves": [
         { "actor": "puckB", "style": "shoot", "to": [11, 42.5] }
       ],
-      "name": "Catch and shoot (bottom line)",
-      "notes": "They get the pass in stride as they curve in across the blue line, and shoot from about the hash marks."
+      "name": "Shoot (bottom line)",
+      "notes": "They shoot from about the hash marks."
     }
   ]
 }
