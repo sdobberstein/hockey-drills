@@ -8,7 +8,7 @@ import { compileFlow } from './compile'
 import type { Starts } from './edit'
 import { drillToFlow } from './import'
 import { appendRun } from './pathEdit'
-import { addPass, believable, endMarker, explain, followers, landingZones, locateOnPath, removePass, setPassSpeed, setPassStyle, snapToLanding } from './passEdit'
+import { clearBank, addPass, believable, endMarker, explain, followers, landingZones, locateOnPath, removePass, setPassSpeed, setPassStyle, snapToLanding } from './passEdit'
 import { segmentsFor } from './timeline'
 import { buildTimelineModel, carrierAtTime, firstPossession, puckCarriedBy } from './view'
 import type { Flow } from './types'
@@ -423,5 +423,37 @@ describe('passing from a skater who has no path', () => {
     const moved = editViaFlow(first, (f, s) => appendRun(f, s, 'F1', 'skate', [[50, 40], [110, 60]]))!
     expect(moved.added).toEqual([])
     expect(validateDrill(moved.drill)).toEqual([])
+  })
+})
+
+describe('a bank pass follows the bounce, not the straight line', () => {
+  it('needs a faster pass than the straight line would, for the same timing', () => {
+    // 40 ft straight to the left, or down to the wall (49 ft) and back (49 ft), in 1.5 s.
+    const straight = believable({ point: [100, 40], time: 0 }, [60, 40], 1.5)
+    const banked = believable({ point: [100, 40], time: 0, via: [[80, 85]] }, [60, 40], 1.5)
+    expect(straight.ok && banked.ok).toBe(true)
+    if (straight.ok && banked.ok) {
+      expect(straight.speed).toBeCloseTo(40 / 1.5)
+      expect(banked.speed).toBeCloseTo((2 * Math.hypot(20, 45)) / 1.5)
+      expect(banked.speed).toBeGreaterThan(straight.speed * 2)
+    }
+  })
+
+  it('can make a landing believable only because of the bounce', () => {
+    // 15 ft in 1 s is 15 ft/s: too slow to be a pass. Out to the boards and back is about 107 ft.
+    expect(believable({ point: [100, 40], time: 0 }, [100, 25], 1).ok).toBe(false)
+    expect(believable({ point: [100, 40], time: 0, via: [[110, 85]] }, [100, 25], 1).ok).toBe(true)
+  })
+})
+
+describe('clearing a bank', () => {
+  it('takes the bounces out and leaves the rest of the pass alone', () => {
+    const flow = {
+      paths: {},
+      events: [{ puck: 'puck', style: 'pass' as const, from: { actor: 'F1', piece: 0, at: 0 }, target: { kind: 'point' as const, at: [20, 40] as [number, number], via: [[30, 85] as [number, number]] } }],
+    }
+    const cleared = clearBank(flow, 0)
+    expect(cleared.events[0].target).toEqual({ kind: 'point', at: [20, 40] })
+    expect(clearBank(cleared, 0)).toBe(cleared)
   })
 })

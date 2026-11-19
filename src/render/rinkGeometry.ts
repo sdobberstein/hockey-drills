@@ -53,3 +53,34 @@ export function viewAspect(view: RinkView): number {
   const [, , w, h] = viewBoxFor(view).split(' ').map(Number)
   return w / h
 }
+
+/**
+ * The point on the boards closest to a spot on the ice, and how far away it is.
+ *
+ * The boards are a rounded rectangle: four straight walls joined by quarter circles of
+ * `cornerRadius`. For each wall the closest point is the spot clamped to that wall; for each
+ * corner it is the point on the arc in the direction of the spot, which only counts if the spot
+ * lies in that corner's quadrant (elsewhere the straight walls are closer or equal). This is
+ * what makes a bounce "off the boards" snap onto the wall instead of floating in open ice.
+ */
+export function nearestBoard(p: readonly [number, number]): { point: [number, number]; distance: number } {
+  const { length: L, width: W, cornerRadius: r } = RINK
+  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
+  const candidates: [number, number][] = [
+    [clamp(p[0], r, L - r), 0], // top wall
+    [clamp(p[0], r, L - r), W], // bottom wall
+    [0, clamp(p[1], r, W - r)], // left wall
+    [L, clamp(p[1], r, W - r)], // right wall
+  ]
+  for (const [cx, cy] of [[r, r], [L - r, r], [r, W - r], [L - r, W - r]] as const) {
+    const dx = p[0] - cx
+    const dy = p[1] - cy
+    // The corner centre is at (r, r) etc., and its arc is the quadrant facing the corner.
+    const facesCorner = (cx < L / 2 ? dx <= 0 : dx >= 0) && (cy < W / 2 ? dy <= 0 : dy >= 0)
+    const d = Math.hypot(dx, dy)
+    if (facesCorner && d > 1e-9) candidates.push([cx + (dx / d) * r, cy + (dy / d) * r])
+  }
+  let best = candidates[0]
+  for (const c of candidates) if (Math.hypot(c[0] - p[0], c[1] - p[1]) < Math.hypot(best[0] - p[0], best[1] - p[1])) best = c
+  return { point: best, distance: Math.hypot(best[0] - p[0], best[1] - p[1]) }
+}

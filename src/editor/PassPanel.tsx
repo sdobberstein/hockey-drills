@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import type { Drill, MoveStyle } from '../engine/types'
 import type { Starts } from '../flow/edit'
 import { drillToFlow } from '../flow/import'
-import { followers, removePass, setPassSpeed, setPassStyle } from '../flow/passEdit'
+import { clearBank, followers, removePass, setPassSpeed, setPassStyle } from '../flow/passEdit'
 import { isAfter, type Flow } from '../flow/types'
 import { buildTimelineModel } from '../flow/view'
 import { CommitField } from './CommitField'
@@ -39,6 +39,15 @@ export function PassPanel({ drill, link, onEdit }: Props) {
         {isAfter(event.from) ? ' (as the puck arrives)' : ''}
         {l.to.actor ? `, lands on ${l.to.actor} at ${l.to.t.toFixed(2)} s` : `, in the air until ${l.to.t.toFixed(2)} s`}.
       </p>
+
+      {event.target.via && event.target.via.length > 0 && (
+        <p className="hint">
+          Banked off the boards ({event.target.via.length} {event.target.via.length === 1 ? 'bounce' : 'bounces'}).{' '}
+          <button type="button" onClick={() => onEdit((f) => clearBank(f, link))}>
+            Make it straight
+          </button>
+        </p>
+      )}
 
       <label className="field">
         <span>Style</span>

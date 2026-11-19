@@ -1,4 +1,4 @@
-import { distance, nearestAlongPath, pointAlong } from '../engine/geometry'
+import { distance, nearestAlongPath, pathLength, pointAlong } from '../engine/geometry'
 import type { MoveStyle, Point } from '../engine/types'
 import type { Starts } from './edit'
 import { MAX_PASS_SPEED, MIN_PASS_SPEED, RELEASE_STYLES } from '../editor/releases'
@@ -104,6 +104,8 @@ export function setPassSpeed(flow: Flow, index: number, speed: number | null): F
 export interface Release {
   point: Point
   time: number
+  /** Bounce points the pass goes through on the way, so its length is the whole route, not the straight line. */
+  via?: readonly Point[]
 }
 
 export type Believability =
@@ -118,7 +120,7 @@ export type Believability =
 export function believable(from: Release, point: Point, time: number): Believability {
   const seconds = time - from.time
   if (seconds <= 1e-3) return { ok: false, reason: 'too-soon', speed: null, seconds }
-  const speed = distance(from.point, point) / seconds
+  const speed = pathLength([from.point, ...(from.via ?? []), point]) / seconds
   if (speed > MAX_PASS_SPEED) return { ok: false, reason: 'too-fast', speed, seconds }
   if (speed < MIN_PASS_SPEED) return { ok: false, reason: 'too-slow', speed, seconds }
   return { ok: true, speed }
@@ -206,4 +208,12 @@ export function explain(b: Extract<Believability, { ok: false }>, receiver: stri
     case 'too-slow':
       return `The pass would only travel ${Math.round(b.speed ?? 0)} ft/s to reach ${receiver} there, taking ${b.seconds.toFixed(2)} s. Pick a spot earlier on their path.`
   }
+}
+
+/** Take the bounces out of a pass: it goes straight from the passer to where it lands. */
+export function clearBank(flow: Flow, index: number): Flow {
+  const e = flow.events[index]
+  if (!e || !e.target.via) return flow
+  const { via: _via, ...target } = e.target
+  return { ...flow, events: flow.events.map((x, i) => (i === index ? { ...x, target } : x)) }
 }

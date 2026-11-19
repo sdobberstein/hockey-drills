@@ -29,7 +29,9 @@ import { DetailsPanel } from './DetailsPanel'
 import { EditStage } from './EditStage'
 import { FlowStage, type PassClick, type StagePhase, type VertexGrab } from './FlowStage'
 import { addActor, deleteActor, moveActor } from './ops'
+import { nearestBoard } from '../render/rinkGeometry'
 import { clampToRink } from './rink'
+
 import { addRelease, applySuggestion, deleteMove, findMove, RELEASE_STYLES, reshapeRoute, setLanding, tieToRunEnd } from './releases'
 import { addRoute, findRoute, insertPoint, movePoint, removePoint } from './routes'
 import { RoutePanel } from './RoutePanel'
@@ -39,6 +41,9 @@ import { SmoothnessPanel } from './SmoothnessPanel'
 import { StepList } from './StepList'
 import { Palette } from './Palette'
 import { useEditor } from './useEditor'
+
+/** How near a wall a Shift-click must be to bounce off it (feet). */
+const BANK_SNAP = 12
 
 /** The editor for a draft, or for a copy of a library drill. */
 export function EditorPage({ id }: { id: string }) {
@@ -74,7 +79,7 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
   // the flow model cannot represent opens in Steps instead, rather than in a view that cannot show it.
   const [mode, setMode] = useState<'steps' | 'flow'>(() => (drillToFlow(drill) ? 'flow' : 'steps'))
   // A pass being linked in the flow view, after its first click (where it leaves).
-  const [passDraft, setPassDraft] = useState<{ puck: string; from: Marker | After; carrier: string; time: number; point: Point } | null>(null)
+  const [passDraft, setPassDraft] = useState<{ puck: string; from: Marker | After; carrier: string; time: number; point: Point; via: Point[] } | null>(null)
   // The pickup tool in the flow view: is it chosen, and once the loose puck is clicked, which one.
   const [pickupTool, setPickupTool] = useState(false)
   const [pickupDraft, setPickupDraft] = useState<LooseSpot | null>(null)
@@ -114,7 +119,7 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
     // For a pickup: where on any skater's path the loose puck can be reached.
     if (pickupDraft) return pickupZones(flow, starts, pickupDraft)
     return passDraft && routeStyle !== 'shoot'
-      ? landingZones(flow, starts, { point: passDraft.point, time: passDraft.time }, passDraft.carrier)
+      ? landingZones(flow, starts, { point: passDraft.point, time: passDraft.time, via: passDraft.via }, passDraft.carrier)
       : []
   }, [flow, starts, passDraft, routeStyle, pickupDraft])
   // Loose pucks that can be picked up (only worked out while the tool is chosen), and the pickups already made.
@@ -336,7 +341,7 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
       // At the instant a pass lands on this skater, it is a release taken as the puck arrives.
       const fed = model.links.findIndex((l, j) => flow.events[j]?.puck === puck && l.to.actor === actor && Math.abs(l.to.t - time) <= 0.15)
       setSelection(null)
-      setPassDraft({ puck, from: fed >= 0 ? { after: fed } : marker, carrier: actor, time, point })
+      setPassDraft({ puck, from: fed >= 0 ? { after: fed } : marker, carrier: actor, time, point, via: [] })
       // If other skaters have paths but none works from here, say so now rather than after a bad click.
       const others = Object.entries(flow.paths).filter(([id, pieces]) => id !== actor && pieces.some((p) => p.kind === 'run'))
       const reachable = style === 'shoot' || others.length === 0 || landingZones(flow, starts, { point, time }, actor).length > 0
@@ -347,7 +352,28 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
     // Second click: where it lands. A landing that cannot work is moved onto the nearest one that
     // can, or explained, so there is never a message that says "pick somewhere believable" and
     // leaves you to guess where that is.
-    const from = { point: passDraft.point, time: passDraft.time }
+    // Shift-click adds a bounce off the boards and keeps the pass open for the next click.
+    if (hit.shift && hit.kind !== 'actor') {
+      if (style !== 'pass') {
+        setMessage('Only a pass can be banked. A shot goes straight at the net.')
+        return
+      }
+      const board = nearestBoard(hit.point)
+      if (board.distance > BANK_SNAP) {
+        setMessage('A bank pass bounces off the boards. Shift-click near a wall.')
+        return
+      }
+      const bounce = clampToRink(board.point)
+      const last = passDraft.via[passDraft.via.length - 1] ?? passDraft.point
+      if (Math.hypot(bounce[0] - last[0], bounce[1] - last[1]) < 3) {
+        setMessage('That bounce is too close to the last point. Pick a spot further along the wall.')
+        return
+      }
+      setPassDraft({ ...passDraft, via: [...passDraft.via, bounce] })
+      setMessage('')
+      return
+    }
+    const from = { point: passDraft.point, time: passDraft.time, via: passDraft.via }
     // Said after the edit, since a successful edit clears the message.
     let note = ''
     const checks = style !== 'shoot'
@@ -388,6 +414,8 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
       target = snap ? { kind: 'marker', marker: snap.marker } : { kind: 'point', at: clampToRink(hit.point) }
     }
     if (!target) return
+    // The bounces go with the landing, whichever kind it is.
+    if (passDraft.via.length > 0) target = { ...target, via: passDraft.via }
 
     const draft = passDraft
     stopDrawing()
@@ -595,6 +623,7 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
               onActorDragEnd={editor.endGesture}
               passTool={releaseTool || pickupTool}
               passFrom={passDraft?.point ?? pickupDraft?.point ?? null}
+              passVia={passDraft?.via ?? []}
               zones={zones}
               onPassClick={onPassClick}
               pickups={pickupMarks}

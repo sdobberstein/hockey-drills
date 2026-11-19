@@ -25,10 +25,14 @@ export interface VertexGrab {
 export type StagePhase = 'start' | 'move' | 'end'
 
 /** What a click landed on while a pass tool is chosen. */
-export type PassClick =
+export type PassClick = (
   | { kind: 'path'; actor: string; point: Point }
   | { kind: 'actor'; id: string }
   | { kind: 'ice'; point: Point }
+) & {
+  /** Shift was held: while linking a pass this adds a bounce off the boards instead of landing it. */
+  shift?: boolean
+}
 
 interface Props {
   drill: Drill
@@ -52,6 +56,8 @@ interface Props {
   passTool: boolean
   /** Where the pass being linked leaves, once that is chosen: drawn with a line to the pointer. */
   passFrom: Point | null
+  /** Bounces already added to that pass, in order. */
+  passVia: readonly Point[]
   /** Stretches of other skaters' paths where that pass could land, drawn in green to aim at. */
   zones: readonly { actor: string; points: readonly Point[] }[]
   onPassClick: (click: PassClick) => void
@@ -127,7 +133,7 @@ export function FlowStage(props: Props) {
       style={{ aspectRatio: aspect, width: `min(100%, calc(70vh * ${aspect}))` }}
       onPointerDown={(e) => {
         if (drawingNow) props.onDrawPoint(toFeet(e))
-        else if (passTool) props.onPassClick({ kind: 'ice', point: toFeet(e) })
+        else if (passTool) props.onPassClick({ kind: 'ice', point: toFeet(e), shift: e.shiftKey })
         else if (armed) props.onPlace(toFeet(e))
         else props.onSelect(null)
       }}
@@ -203,7 +209,7 @@ export function FlowStage(props: Props) {
                 style={{ cursor: 'pointer' }}
                 onPointerDown={(e) => {
                   e.stopPropagation()
-                  if (passTool) props.onPassClick({ kind: 'path', actor, point: toFeet(e) })
+                  if (passTool) props.onPassClick({ kind: 'path', actor, point: toFeet(e), shift: e.shiftKey })
                   else props.onSelect({ kind: 'piece', actor, piece: seg.index })
                 }}
               />
@@ -215,7 +221,10 @@ export function FlowStage(props: Props) {
       {/* The pass being linked: where it leaves, and a dashed line to the pointer. */}
       {passFrom && (
         <g pointerEvents="none" fill="none" stroke="#b3541e" strokeWidth={0.5} strokeLinecap="round">
-          {cursor && <line x1={passFrom[0]} y1={passFrom[1]} x2={cursor[0]} y2={cursor[1]} strokeDasharray="1.2 0.9" />}
+          <polyline points={pointsAttr([passFrom, ...props.passVia, ...(cursor ? [cursor] : [])])} strokeDasharray="1.2 0.9" strokeLinejoin="round" />
+          {props.passVia.map(([x, y], i) => (
+            <circle key={i} cx={x} cy={y} r={1} fill="#fff" stroke="#b3541e" strokeWidth={0.5} />
+          ))}
           <circle cx={passFrom[0]} cy={passFrom[1]} r={1.3} fill="#b3541e" stroke="#fff" strokeWidth={0.4} />
         </g>
       )}
