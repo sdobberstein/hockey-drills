@@ -1,5 +1,7 @@
 import type { Drill } from './types'
-import cycleJson from '../../drills/cycle-give-and-go.json'
+// A frozen copy of the cycle drill as it was when these tests were written, NOT the live one in
+// drills/: that file gets rebuilt as the editor improves, and the tests index into its exact steps.
+import cycleJson from './cycleGiveAndGo.fixture.json'
 
 /**
  * A small drill kept inside the tests on purpose, NOT read from drills/.
