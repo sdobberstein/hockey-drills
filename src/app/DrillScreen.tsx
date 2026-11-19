@@ -4,6 +4,7 @@ import { libraryDrills } from '../library/drills'
 import { neighbours, seriesTitle } from '../library/library'
 import { Player } from '../player/Player'
 import { ShareBar } from './ShareBar'
+import { SourceCredit } from './SourceCredit'
 import { startEditing } from './share'
 
 /** A drill with its title, share actions, progression links and player. */
@@ -30,6 +31,7 @@ export function DrillScreen({ drill, inLibrary }: { drill: Drill; inLibrary: boo
 
       <h2 className="drill-title">{drill.title}</h2>
       {drill.description && <p className="description">{drill.description}</p>}
+      <SourceCredit drill={drill} />
 
       {near && drill.progression && (
         <nav className="progression" aria-label="Progression">

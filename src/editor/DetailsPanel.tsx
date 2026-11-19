@@ -1,6 +1,6 @@
 import type { Drill, RinkView } from '../engine/types'
 import { CommitField } from './CommitField'
-import { parseTags, setDetails } from './ops'
+import { parseTags, setDetails, setSource } from './ops'
 
 const VIEWS: { value: RinkView; name: string }[] = [
   { value: 'full', name: 'Full rink' },
@@ -37,6 +37,20 @@ export function DetailsPanel({ drill, onEdit }: { drill: Drill; onEdit: (next: D
           ))}
         </select>
       </label>
+      {/* Credit for a drill adapted from somewhere else. The link comes first: without it there is no source to hang the rest on. */}
+      <CommitField
+        label="Adapted from (link to the original)"
+        value={drill.source?.url ?? ''}
+        placeholder="https://"
+        onCommit={(url) => onEdit(setSource(drill, { url }))}
+      />
+      {drill.source && (
+        <>
+          <CommitField label="Original title" value={drill.source.title ?? ''} onCommit={(title) => onEdit(setSource(drill, { title }))} />
+          <CommitField label="Original author" value={drill.source.author ?? ''} onCommit={(author) => onEdit(setSource(drill, { author }))} />
+          <CommitField label="Site" value={drill.source.site ?? ''} onCommit={(site) => onEdit(setSource(drill, { site }))} />
+        </>
+      )}
       <p className="hint">
         Id: <code>{drill.id}</code>
       </p>

@@ -37,6 +37,13 @@ h1 {
   color: #444;
 }
 
+/* The credit for a drill adapted from somewhere else: quieter than the description. */
+.source {
+  color: #666;
+  font-size: 0.9rem;
+  margin-top: -0.4rem;
+}
+
 .player svg {
   max-width: 100%;
   display: block;

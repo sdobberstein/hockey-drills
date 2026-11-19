@@ -108,6 +108,20 @@ export interface Progression {
   order: number
 }
 
+/**
+ * Where a drill was adapted from, so the original author is credited properly and anyone can
+ * go and read the original. Every part but the link is optional.
+ */
+export interface DrillSource {
+  /** The original page. Only http and https links are allowed (see sourceLink in app/source.ts). */
+  url: string
+  /** The original's own title, when it differs from ours. */
+  title?: string
+  author?: string
+  /** The site or publisher, such as a coaching website. */
+  site?: string
+}
+
 export interface Drill {
   version: 1
   id: string
@@ -116,6 +130,7 @@ export interface Drill {
   tags?: string[]
   rink: RinkView
   progression?: Progression
+  source?: DrillSource
   actors: Actor[]
   steps: Step[]
 }

@@ -1,4 +1,4 @@
-import type { Actor, ActorType, Drill, Point, RinkView } from '../engine/types'
+import type { Actor, ActorType, Drill, DrillSource, Point, RinkView } from '../engine/types'
 import { clampToRink } from './rink'
 import { reanchor } from './routes'
 
@@ -168,6 +168,27 @@ export function setDetails(
     if (patch.tags.length === 0) delete next.tags
     else next.tags = patch.tags
   }
+  return next
+}
+
+/**
+ * Edit where the drill came from. The link is what makes it a source, so with no link there is
+ * no source at all (whatever else was typed is dropped); the other parts are left out when empty.
+ */
+export function setSource(drill: Drill, patch: { url?: string; title?: string; author?: string; site?: string }): Drill {
+  const merged = { ...drill.source, ...patch }
+  const next: Drill = { ...drill }
+  const url = (merged.url ?? '').trim()
+  if (url === '') {
+    delete next.source
+    return next
+  }
+  const source: DrillSource = { url }
+  for (const key of ['title', 'author', 'site'] as const) {
+    const value = (merged[key] ?? '').trim()
+    if (value !== '') source[key] = value
+  }
+  next.source = source
   return next
 }
 
