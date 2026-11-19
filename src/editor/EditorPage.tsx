@@ -67,8 +67,10 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
   const [previewing, setPreviewing] = useState(false)
   // A short confirmation next to the toolbar after copying a share link.
   const [sharedNote, setSharedNote] = useState('')
-  // Two ways to work on the same drill: step by step, or as one path per skater.
-  const [mode, setMode] = useState<'steps' | 'flow'>('steps')
+  // Two ways to work on the same drill: step by step, or as one path per skater. Flow is the
+  // default because it is how a drill is usually thought of (who goes where, and when); a drill
+  // the flow model cannot represent opens in Steps instead, rather than in a view that cannot show it.
+  const [mode, setMode] = useState<'steps' | 'flow'>(() => (drillToFlow(drill) ? 'flow' : 'steps'))
   // A pass being linked in the flow view, after its first click (where it leaves).
   const [passDraft, setPassDraft] = useState<{ puck: string; from: Marker | After; carrier: string; time: number; point: Point } | null>(null)
   // The drill as it was when a timeline drag began: every step of the drag is
