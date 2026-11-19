@@ -43,7 +43,9 @@ function mapMarkers(flow: Flow, actor: string, change: (m: Marker) => Marker): F
     if (e.target.kind === 'marker') next.target = { ...e.target, marker: one(e.target.marker) }
     return next
   })
-  return { ...flow, events }
+  // A pickup is anchored to a marker as well, so it has to follow the same reshaping.
+  const pickups = flow.pickups?.map((u) => ({ ...u, marker: one(u.marker) }))
+  return { ...flow, events, ...(pickups ? { pickups } : {}) }
 }
 
 /** Where a skater is when their path ends: the end of the last piece, or where they start. */

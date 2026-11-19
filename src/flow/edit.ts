@@ -33,13 +33,15 @@ function withPieces(flow: Flow, actor: string, pieces: Piece[]): Flow {
 
 /** Apply a change to every marker in the flow that belongs to `actor`. */
 function mapMarkers(flow: Flow, actor: string, change: (m: Marker) => Marker): Flow {
-  const mapOne = (m: Marker): Marker => (m.actor === actor ? change(m) : m)
+  const one = (m: Marker): Marker => (m.actor === actor ? change(m) : m)
   const events = flow.events.map((e): PuckEvent => {
-    const next: PuckEvent = { ...e, from: isAfter(e.from) ? e.from : mapOne(e.from) }
-    if (e.target.kind === 'marker') next.target = { ...e.target, marker: mapOne(e.target.marker) }
+    const next: PuckEvent = { ...e, from: isAfter(e.from) ? e.from : one(e.from) }
+    if (e.target.kind === 'marker') next.target = { ...e.target, marker: one(e.target.marker) }
     return next
   })
-  return { ...flow, events }
+  // A pickup is anchored to a marker as well, so it has to follow the same reshaping.
+  const pickups = flow.pickups?.map((u) => ({ ...u, marker: one(u.marker) }))
+  return { ...flow, events, ...(pickups ? { pickups } : {}) }
 }
 
 /**

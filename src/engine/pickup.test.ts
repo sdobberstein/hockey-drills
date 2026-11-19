@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { drillToFlow } from '../flow/import'
 import { parseDrill } from './parse'
 import { buildTimeline } from './timeline'
 import type { Drill } from './types'
@@ -61,6 +60,16 @@ describe('picking up a loose puck (a dump-in, retrieved)', () => {
     })
   }
 
+  it('does not care which of the two moves is listed first in the step', () => {
+    const d = dumpIn(true)
+    d.steps[0].moves.reverse() // the skater's move, then the puck's pass
+    expect(validateDrill(d)).toEqual([])
+    const tl = buildTimeline(d)
+    const end = tl.at(tl.duration)
+    expect(near(end.puck, end.F2)).toBe(true)
+    expect(tl.plan.steps[0].after.carriers.get('puck')).toBe('F2')
+  })
+
   it('lets the puck be picked up in stride: the skater does not stop at the corner', () => {
     const d = dumpIn(false)
     d.steps[1].moves[0] = { actor: 'F2', style: 'skate', points: [[120, 60], [185, 20], CORNER], picksUp: 'puck' }
@@ -109,11 +118,5 @@ describe('what a pickup is not allowed to do', () => {
     const d = dumpIn(false)
     d.steps[1].moves[0] = { actor: 'F2', style: 'skate', points: [[120, 60], CORNER], picksUp: 'F1' }
     expect(codes(d)).toEqual(['unknown-target'])
-  })
-})
-
-describe('the flow view does not yet know about pickups', () => {
-  it('declines to import a drill that has one, rather than silently drop it', () => {
-    expect(drillToFlow(dumpIn(false))).toBeNull()
   })
 })

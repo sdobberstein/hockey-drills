@@ -2,7 +2,7 @@ import { distance } from '../engine/geometry'
 import { planDrill } from '../engine/plan'
 import type { Drill, Point } from '../engine/types'
 import { endTime, markerAtTime, segmentsFor, TIME_EPS } from './timeline'
-import type { After, EventTarget, Flow, Marker, Phase, Piece, PuckEvent, RunPiece } from './types'
+import type { After, EventTarget, Flow, Marker, Phase, Piece, Pickup, PuckEvent, RunPiece } from './types'
 
 const copy = (p: Point): Point => [p[0], p[1]]
 
@@ -28,9 +28,9 @@ export function drillToFlow(drill: Drill): Flow | null {
   // The planner tolerates a move by someone who is not in the drill; a flow cannot.
   const known = new Set(drill.actors.map((a) => a.id))
   if (drill.steps.some((s) => s.moves.some((m) => !known.has(m.actor)))) return null
-  // The flow model has no way to say "picks up a loose puck" yet. Refuse rather than import the
-  // drill and silently lose the pickup the next time it is edited; the Steps view still works.
-  if (drill.steps.some((s) => s.moves.some((m) => m.picksUp))) return null
+  // A pickup is anchored to the end of a run, so the move that collects needs a path of its own.
+  // A bare `to` skater move is not imported (see below), which would lose the pickup: refuse.
+  if (drill.steps.some((s) => s.moves.some((m) => m.picksUp && !m.points))) return null
   const startOf = (id: string): Point => drill.actors.find((a) => a.id === id)!.start
 
   // 1. Each actor's runs, with a wait wherever they were idle between them.
@@ -118,6 +118,14 @@ export function drillToFlow(drill: Drill): Flow | null {
       land(planned.actor, planned, step.start + planned.duration)
     })
   })
+  // 3b. Pickups: the skater's run ends where they take the loose puck.
+  const pickups: Pickup[] = []
+  plan.steps.forEach((step) => {
+    for (const planned of step.moves) {
+      if (planned.picksUp) pickups.push({ puck: planned.picksUp, marker: markerFor(planned.actor, step.start + planned.duration) })
+    }
+  })
+
   // 4. The names and notes a coach gave the steps, kept as phases.
   const phases: Phase[] = []
   plan.steps.forEach((step, si) => {
@@ -125,7 +133,7 @@ export function drillToFlow(drill: Drill): Flow | null {
     if (name || notes) phases.push({ start: step.start, ...(name ? { name } : {}), ...(notes ? { notes } : {}) })
   })
 
-  return broken ? null : { paths, events, ...(phases.length > 0 ? { phases } : {}) }
+  return broken ? null : { paths, events, ...(pickups.length > 0 ? { pickups } : {}), ...(phases.length > 0 ? { phases } : {}) }
 }
 
 /** Standing still: extend a wait that is already last, so two waits never sit side by side. */

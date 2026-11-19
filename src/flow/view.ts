@@ -161,11 +161,27 @@ export function buildTimelineModel(drill: Drill): TimelineModel | null {
     const spans: PuckSpan[] = []
     let carrier: string | null = actor.carriedBy ?? null
     let clock = 0
-    for (const f of flights.filter((x) => x.puck === actor.id).sort((a, b) => a.t0 - b.t0)) {
-      if (f.t0 > clock) spans.push({ t0: clock, t1: f.t0, carrier })
-      spans.push({ t0: f.t0, t1: f.t1, carrier: null, flight: f.style })
-      carrier = f.receiver ?? null
-      clock = f.t1
+    // What happens to this puck, in order: flights, and skaters collecting it when their run ends.
+    type Happening = { at: number; flight: Flight } | { at: number; picker: string }
+    const happenings: Happening[] = [
+      ...flights.filter((x) => x.puck === actor.id).map((flight): Happening => ({ at: flight.t0, flight })),
+      ...plan.steps.flatMap((s) =>
+        s.moves.filter((m) => m.picksUp === actor.id).map((m): Happening => ({ at: s.start + m.duration, picker: m.actor })),
+      ),
+    ].sort((a, b) => a.at - b.at)
+    for (const h of happenings) {
+      if ('flight' in h) {
+        const f = h.flight
+        if (f.t0 > clock) spans.push({ t0: clock, t1: f.t0, carrier })
+        spans.push({ t0: f.t0, t1: f.t1, carrier: null, flight: f.style })
+        carrier = f.receiver ?? null
+        clock = f.t1
+      } else {
+        // It lay loose (carrier null) until the skater got there, then it is theirs.
+        if (h.at > clock) spans.push({ t0: clock, t1: h.at, carrier })
+        carrier = h.picker
+        clock = Math.max(clock, h.at)
+      }
     }
     // A puck always has at least one span, even in a drill with no moves yet (duration 0), so
     // "who has it" has an answer before anything has happened: that is when you link the first pass.

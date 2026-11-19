@@ -121,8 +121,12 @@ export function planDrill(drill: Drill): Plan {
       positions.set(m.actor, m.path[m.path.length - 1])
       if (m.releases) carriers.delete(m.actor)
       if (m.receiver) carriers.set(m.actor, m.receiver)
-      // A pickup happens when the skater's own move ends, so the puck is theirs for the next
-      // step. (Within this step it rides them from that moment; see frameAt in timeline.ts.)
+    }
+    // A pickup happens when the skater's own move ends, so the puck is theirs for the next
+    // step. (Within this step it rides them from that moment; see frameAt in timeline.ts.)
+    // It is applied after every release, not in move order: a skater's move can be listed
+    // before the puck's pass in the same step, and the pass must not wipe out the pickup.
+    for (const m of moves) {
       if (m.picksUp) carriers.set(m.picksUp, m.actor)
     }
     syncCarried(positions, carriers)

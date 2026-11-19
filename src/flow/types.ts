@@ -87,10 +87,23 @@ export interface Phase {
   notes?: string
 }
 
+/**
+ * A skater taking a loose puck: "F2 picks up the puck when they reach here". The skater is
+ * `marker.actor` and the marker is the end of the run that collects it, so a pickup moves
+ * with that run the same way a pass does. The puck must be lying loose by then (a pass or
+ * shot that nobody received, or one that has not moved) and close enough to reach.
+ */
+export interface Pickup {
+  puck: string
+  marker: Marker
+}
+
 export interface Flow {
   /** Each actor's path. An actor with no entry stands still for the whole drill. */
   paths: Record<string, Piece[]>
   events: PuckEvent[]
+  /** Loose pucks skaters collect, in any order. */
+  pickups?: Pickup[]
   /** Named stretches, in order of start. */
   phases?: Phase[]
 }

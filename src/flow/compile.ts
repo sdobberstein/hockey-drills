@@ -14,6 +14,7 @@ export interface FlowProblem {
     | 'nobody-moves'
     | 'unknown-actor'
     | 'bad-chain'
+    | 'pickup-no-run'
     | 'drill-invalid'
   message: string
   /** Seconds into the drill, when the problem has a moment. */
@@ -151,6 +152,20 @@ export function compileFlow(drill: Drill, flow: Flow): Compiled {
     marks.push({ t: r.tRel, starts: true })
     end = Math.max(end, r.tLand)
   }
+  // A pickup happens when a skater's run ends there, so the move must end exactly then: a
+  // boundary, and one where something starts so that it is never merged away.
+  const pickups = (flow.pickups ?? []).flatMap((u) => {
+    const list = segs.get(u.marker.actor)
+    if (!list) {
+      problems.push({ code: 'unknown-actor', message: `${u.marker.actor} picks up the puck but is not in the drill.` })
+      return []
+    }
+    return [{ ...u, t: markerTime(list, u.marker) }]
+  })
+  for (const u of pickups) {
+    marks.push({ t: u.t, starts: true })
+    end = Math.max(end, u.t)
+  }
   // A phase starts a step of its own, so that the name has a step to go on.
   for (const phase of flow.phases ?? []) {
     if (phase.start >= 0 && phase.start < end) marks.push({ t: phase.start, starts: true })
@@ -218,7 +233,12 @@ export function compileFlow(drill: Drill, flow: Flow): Compiled {
       }
       if (best && most > 1e-4) {
         const move = emitRun(actor.id, best, Math.max(a, best.t0), Math.min(c, best.t1))
-        if (move) moves.push(move)
+        if (move) {
+          // The pickup goes on the move that ends at the moment of the pickup.
+          const collects = pickups.find((u) => u.marker.actor === actor.id && Math.abs(u.t - c) <= MERGE)
+          if (collects) move.picksUp = collects.puck
+          moves.push(move)
+        }
       }
     }
 
@@ -241,6 +261,16 @@ export function compileFlow(drill: Drill, flow: Flow): Compiled {
     if (name) step.name = name
     if (phase?.notes) step.notes = phase.notes
     steps.push(step)
+  }
+
+  for (const u of pickups) {
+    if (!steps.some((s) => s.moves.some((m) => m.actor === u.marker.actor && m.picksUp === u.puck))) {
+      problems.push({
+        code: 'pickup-no-run',
+        time: u.t,
+        message: `${u.marker.actor} picks up the puck at ${u.t.toFixed(2)} s but is not skating then. A pickup has to be where one of their runs reaches the puck.`,
+      })
+    }
   }
 
   const result: Drill = { ...drill, steps }
