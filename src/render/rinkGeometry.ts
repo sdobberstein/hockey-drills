@@ -25,6 +25,9 @@ export const RINK = {
   creaseRadius: 6,
   netWidth: 6,
   netDepth: 4,
+  /** End-zone circle hash marks: 2 ft long, 5 ft 11 in apart (inside edges), so each is ~2.96 ft either side of the circle's centre line. */
+  hashLength: 2,
+  hashHalfGap: 2.96,
 } as const
 
 /** Whitespace around the rink in the picture, in feet. */
@@ -83,4 +86,22 @@ export function nearestBoard(p: readonly [number, number]): { point: [number, nu
   let best = candidates[0]
   for (const c of candidates) if (Math.hypot(c[0] - p[0], c[1] - p[1]) < Math.hypot(best[0] - p[0], best[1] - p[1])) best = c
   return { point: best, distance: Math.hypot(best[0] - p[0], best[1] - p[1]) }
+}
+
+/** One short line, as [x1, y1, x2, y2] in feet. */
+export type Segment4 = readonly [number, number, number, number]
+
+/**
+ * The hash marks of an end-zone faceoff circle: two short lines just outside the circle at its top
+ * (toward the near boards) and two at its bottom, each running away from the circle, parallel to
+ * the goal line. The marks are what coaches mean by "the hashes": the points where the circle
+ * reaches its widest along the width of the ice.
+ */
+export function hashMarks(cx: number, cy: number): Segment4[] {
+  const { faceoffRadius: r, hashLength: len, hashHalfGap: gap } = RINK
+  const out: Segment4[] = []
+  for (const side of [-1, 1]) {
+    for (const x of [cx - gap, cx + gap]) out.push([x, cy + side * r, x, cy + side * (r + len)])
+  }
+  return out
 }

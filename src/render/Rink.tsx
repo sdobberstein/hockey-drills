@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { RINK } from './rinkGeometry'
+import { hashMarks, RINK } from './rinkGeometry'
 
 const RED = '#c8102e'
 const BLUE = '#1f4fb5'
@@ -47,6 +47,10 @@ export function Rink() {
           <g key={`${x}-${y}`}>
             <circle cx={x} cy={y} r={RINK.faceoffRadius} fill="none" stroke={RED} strokeWidth={0.3} />
             <circle cx={x} cy={y} r={1} fill={RED} />
+            {/* The hash marks, just outside the circle at its top and bottom. */}
+            {hashMarks(x, y).map(([x1, y1, x2, y2], i) => (
+              <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={RED} strokeWidth={0.3} />
+            ))}
           </g>
         )),
       )}
