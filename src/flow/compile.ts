@@ -166,6 +166,17 @@ export function compileFlow(drill: Drill, flow: Flow): Compiled {
     marks.push({ t: u.t, starts: true })
     end = Math.max(end, u.t)
   }
+  // Who holds the puck when, so forward skating can be drawn (and saved) as "with puck" on exactly
+  // the stretches where it is true. A catch in stride lands in the middle of a receiver's run, so
+  // that moment needs a boundary too, or the run could not change style there.
+  const holding = possession(drill, resolved, pickups)
+  for (const r of resolved) {
+    if (!r.receiver) continue
+    const inside = (segs.get(r.receiver) ?? []).some(
+      (s) => s.piece.kind === 'run' && s.piece.style === 'skate' && s.t0 + MERGE < r.tLand && r.tLand < s.t1 - MERGE,
+    )
+    if (inside) marks.push({ t: r.tLand, starts: true })
+  }
   // A phase starts a step of its own, so that the name has a step to go on.
   for (const phase of flow.phases ?? []) {
     if (phase.start >= 0 && phase.start < end) marks.push({ t: phase.start, starts: true })
@@ -238,7 +249,10 @@ export function compileFlow(drill: Drill, flow: Flow): Compiled {
         }
       }
       if (best && most > 1e-4) {
-        const move = emitRun(actor.id, best, Math.max(a, best.t0), Math.min(c, best.t1))
+        const from = Math.max(a, best.t0)
+        const to = Math.min(c, best.t1)
+        const carries = holding.some((h) => h.actor === actor.id && h.t0 <= (from + to) / 2 && (from + to) / 2 < h.t1)
+        const move = emitRun(actor.id, best, from, to, carries)
         if (move) {
           // The pickup goes on the move that ends at the moment of the pickup.
           const collects = pickups.find((u) => u.marker.actor === actor.id && Math.abs(u.t - c) <= MERGE)
@@ -295,7 +309,7 @@ export function compileFlow(drill: Drill, flow: Flow): Compiled {
  * own points and the smooth flag. A smooth run cut part-way is emitted as the
  * dense points of the curve, so the geometry is exact and the pieces join up.
  */
-function emitRun(actor: string, seg: Segment, tA: number, tB: number): Move | null {
+function emitRun(actor: string, seg: Segment, tA: number, tB: number, carries: boolean): Move | null {
   const piece = seg.piece as RunPiece
   const s0 = Math.max((tA - seg.t0) * seg.speed, 0)
   const s1 = Math.min((tB - seg.t0) * seg.speed, seg.length)
@@ -312,10 +326,14 @@ function emitRun(actor: string, seg: Segment, tA: number, tB: number): Move | nu
   }
   if (points.length < 2) return null
 
-  const move: Move = { actor, style: piece.style, points }
+  // Forward skating is drawn "with puck" whenever the skater is carrying it, so nobody has to say so.
+  // (A piece that is explicitly skate-puck stays that way.) The speed does not change with it: a run
+  // has one speed, and changing it at a catch would move every time that comes after.
+  const style = piece.style === 'skate' && carries ? 'skate-puck' : piece.style
+  const move: Move = { actor, style, points }
   if (smooth) move.smooth = true
-  // The nominal speed is exact by construction; leave it out when it is the style's default.
-  if (Math.abs(seg.speed - DEFAULT_SPEEDS[piece.style]) >= 0.05) move.speed = seg.speed
+  // The nominal speed is exact by construction; leave it out when it is the emitted style's default.
+  if (Math.abs(seg.speed - DEFAULT_SPEEDS[style]) >= 0.05) move.speed = seg.speed
   return move
 }
 
@@ -350,4 +368,45 @@ function emitFlight(r: Resolved, a: number, c: number): Move | null {
   if (last && receiver !== undefined) move.receiver = receiver
   if (!first) move.continues = true
   return move
+}
+
+/** A skater holding a puck from one moment to another (t1 may be Infinity: until the end). */
+export interface Holding {
+  actor: string
+  t0: number
+  t1: number
+}
+
+/**
+ * Who holds each puck, and when, worked out from the flow: whoever it starts with, then a hand-over
+ * at every release (the carrier lets go) and landing (the receiver has it), and every pickup.
+ */
+function possession(
+  drill: Drill,
+  resolved: readonly { event: PuckEvent; carrier: string; tRel: number; tLand: number; receiver?: string }[],
+  pickups: readonly { puck: string; marker: { actor: string }; t: number }[],
+): Holding[] {
+  const out: Holding[] = []
+  for (const puck of drill.actors.filter((a) => a.type === 'puck')) {
+    type Change = { t: number; order: number; holder: string | null }
+    const changes: Change[] = []
+    // At the same moment a catch comes before a release, so a shot taken as the puck arrives is held for an instant.
+    for (const r of resolved) {
+      if (r.event.puck !== puck.id) continue
+      changes.push({ t: r.tRel, order: 1, holder: null })
+      if (r.receiver) changes.push({ t: r.tLand, order: 0, holder: r.receiver })
+    }
+    for (const u of pickups) if (u.puck === puck.id) changes.push({ t: u.t, order: 0, holder: u.marker.actor })
+    changes.sort((x, y) => x.t - y.t || x.order - y.order)
+
+    let holder: string | null = puck.carriedBy ?? null
+    let since = 0
+    for (const c of changes) {
+      if (holder && c.t > since) out.push({ actor: holder, t0: since, t1: c.t })
+      holder = c.holder
+      since = c.t
+    }
+    if (holder) out.push({ actor: holder, t0: since, t1: Infinity })
+  }
+  return out
 }

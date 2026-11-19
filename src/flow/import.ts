@@ -1,5 +1,5 @@
 import { distance } from '../engine/geometry'
-import { planDrill } from '../engine/plan'
+import { DEFAULT_SPEEDS, planDrill } from '../engine/plan'
 import type { Drill, Point } from '../engine/types'
 import { endTime, markerAtTime, segmentsFor, TIME_EPS } from './timeline'
 import type { After, EventTarget, Flow, Marker, Phase, Piece, Pickup, PuckEvent, RunPiece } from './types'
@@ -44,8 +44,14 @@ export function drillToFlow(drill: Drill): Flow | null {
       const list = (paths[planned.actor] ??= [])
       const gap = step.start - (clocks.get(planned.actor) ?? 0)
       if (gap > TIME_EPS) addWait(list, gap)
-      const run: RunPiece = { kind: 'run', style: raw.style, points: raw.points.map(copy) }
-      if (raw.speed !== undefined) run.speed = raw.speed
+      // Skating with the puck is not a separate kind of run here: whether the skater has the puck is
+      // known from the passes, so compileFlow brings the symbol back on exactly the stretches that
+      // need it. Its speed is kept, though, because the style's default (22, against 25 for plain
+      // skating) is part of how long the run lasts.
+      const withPuck = raw.style === 'skate-puck'
+      const run: RunPiece = { kind: 'run', style: withPuck ? 'skate' : raw.style, points: raw.points.map(copy) }
+      const speed = raw.speed ?? (withPuck ? DEFAULT_SPEEDS['skate-puck'] : undefined)
+      if (speed !== undefined) run.speed = speed
       if (raw.smooth) run.smooth = true
       list.push(run)
       clocks.set(planned.actor, step.start + planned.duration)

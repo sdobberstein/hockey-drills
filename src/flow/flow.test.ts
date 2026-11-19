@@ -62,8 +62,12 @@ describe('import then compile behaves like the original', () => {
   it('keeps every step name and note, in the same order', () => {
     for (const [, drill] of library) {
       const { drill: rebuilt } = roundTrip(drill)
-      expect(rebuilt.steps.map((s) => s.name)).toEqual(drill.steps.map((s) => s.name))
-      expect(rebuilt.steps.map((s) => s.notes)).toEqual(drill.steps.map((s) => s.notes))
+      // A catch in stride is a step boundary of its own (that is where forward skating changes to
+      // "with puck"), so the rebuilt drill can have extra unnamed steps; what has to survive is the
+      // names and notes, in order.
+      const named = (steps: typeof drill.steps, key: 'name' | 'notes') => steps.map((s) => s[key]).filter(Boolean)
+      expect(named(rebuilt.steps, 'name')).toEqual(named(drill.steps, 'name'))
+      expect(named(rebuilt.steps, 'notes')).toEqual(named(drill.steps, 'notes'))
     }
   })
 

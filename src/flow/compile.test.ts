@@ -245,10 +245,11 @@ describe('problems are reported, not hidden', () => {
   })
 
   it('reports anything the validator would reject in the result', () => {
-    const f = flow()
-    f.events[0].puck = 'puck'
-    f.events[0].from = { actor: 'F2', piece: 0, at: 5 } // F2 is not carrying the puck
-    expect(codes(f)).toContain('drill-invalid')
+    // Nobody is carrying the puck, so there is nothing to pass: the compiler does not check that
+    // itself, it asks the validator and passes on what it says.
+    const d = base()
+    d.actors = d.actors.map((a) => (a.id === 'puck' ? { id: 'puck', type: 'puck' as const, start: [50, 20] as [number, number] } : a))
+    expect(compileFlow(d, flow()).problems.map((p) => p.code)).toContain('drill-invalid')
   })
 })
 
