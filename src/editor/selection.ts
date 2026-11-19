@@ -10,6 +10,8 @@ export type Selection =
   | { kind: 'piece'; actor: string; piece: number }
   /** A pass, shot or drop pass in the flow view, by its number in the order they happen. */
   | { kind: 'pass'; link: number }
+  /** A skater collecting a loose puck in the flow view, by its place in flow.pickups. */
+  | { kind: 'pickup'; index: number }
   | null
 
 /** A route being drawn, one click at a time. The first point is where the actor stands. */

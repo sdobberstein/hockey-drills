@@ -3,7 +3,7 @@ import { buildTimeline } from '../engine/timeline'
 import type { Drill } from '../engine/types'
 import { compileFlow } from './compile'
 import { drillToFlow } from './import'
-import { addPickup, bestPickup, looseSpots, pickupZones, PICKUP_REACH, removePickup } from './pickupEdit'
+import { addPickup, bestPickup, looseSpots, pickupZones, PICKUP_NEAR, removePickup } from './pickupEdit'
 import type { Flow } from './types'
 import { buildTimelineModel } from './view'
 
@@ -71,10 +71,10 @@ describe('where a skater can reach it', () => {
   const spot = looseSpots(drill, flow, buildTimelineModel(drill)!)[0]
   const zones = pickupZones(flow, starts, spot)
 
-  it('is the stretch of F2 s run that passes through the corner, and nothing else', () => {
+  it('is only the stretch of F2\'s run near the corner, within the distance a dump can be moved', () => {
     expect(zones.every((z) => z.actor === 'F2')).toBe(true)
     expect(zones.length).toBeGreaterThanOrEqual(1)
-    for (const z of zones) for (const p of z.points) expect(Math.hypot(p[0] - spot.point[0], p[1] - spot.point[1])).toBeLessThanOrEqual(PICKUP_REACH + 1e-6)
+    for (const z of zones) for (const p of z.points) expect(Math.hypot(p[0] - spot.point[0], p[1] - spot.point[1])).toBeLessThanOrEqual(PICKUP_NEAR + 1e-6)
   })
 
   it('does not include a skater who gets there before the puck has landed', () => {
@@ -109,5 +109,48 @@ describe('removing a pickup', () => {
     const withOne = addPickup(flow, { puck: 'puck', marker: { actor: 'F2', piece: 0, at: 60 } })
     expect(removePickup(withOne, 0).pickups).toBeUndefined()
     expect(removePickup(withOne, 5)).toBe(withOne)
+  })
+})
+
+describe('a run that ends a few feet from a dumped puck', () => {
+  /** F2 runs to a spot 3.5 ft short of where the puck was dumped: close by eye, not within reach. */
+  const loose = (): { drill: Drill; flow: Flow } => {
+    const flow: Flow = {
+      paths: { F2: [{ kind: 'run', style: 'skate', points: [[120, 60], [165, 40], [188, 9]] }] },
+      events: [{ puck: 'puck', style: 'pass', from: { actor: 'F1', piece: 0, at: 0 }, target: { kind: 'point', at: CORNER } }],
+    }
+    const drill = compileFlow(base(), flow).drill
+    return { drill, flow: drillToFlow(drill)! }
+  }
+
+  it('is offered, because the dump can move onto the skater', () => {
+    const { drill, flow } = loose()
+    const spot = looseSpots(drill, flow, buildTimelineModel(drill)!)[0]
+    expect(spot.event).toBe(0)
+    expect(pickupZones(flow, starts, spot).length).toBeGreaterThan(0)
+  })
+
+  it('moves the dump to where the skater collects it, so the drill is valid', () => {
+    const { drill, flow } = loose()
+    const spot = looseSpots(drill, flow, buildTimelineModel(drill)!)[0]
+    const snap = bestPickup(pickupZones(flow, starts, spot), spot, [186, 11], 12)!
+    const made = compileFlow(base(), addPickup(flow, { puck: 'puck', marker: snap.marker }, { spot, at: snap.point }))
+    expect(made.problems).toEqual([])
+    const tl = buildTimeline(made.drill)
+    const end = tl.at(tl.duration)
+    expect(Math.hypot(end.puck[0] - end.F2[0], end.puck[1] - end.F2[1])).toBeLessThan(0.1)
+    // The puck lay at the pickup point, not at the old corner spot.
+    const lay = tl.at(2).puck
+    expect(Math.hypot(lay[0] - snap.point[0], lay[1] - snap.point[1])).toBeLessThan(0.5)
+  })
+
+  it('does not move a puck that started loose, which keeps the strict reach', () => {
+    const d = base()
+    d.actors[2] = { id: 'puck', type: 'puck', start: [60, 30] }
+    const flow: Flow = { paths: { F2: [{ kind: 'run', style: 'skate', points: [[120, 60], [60, 36]] }] }, events: [] }
+    const drill = compileFlow(d, flow).drill
+    const spot = looseSpots(drill, drillToFlow(drill)!, buildTimelineModel(drill)!)[0]
+    expect(spot.event).toBeUndefined()
+    expect(pickupZones(drillToFlow(drill)!, starts, spot)).toEqual([]) // 6 ft away: too far, and it cannot move
   })
 })

@@ -10,6 +10,7 @@ import { editViaFlow } from '../flow/apply'
 import { moveLanding, moveRelease, removeWait, setRunSeconds, setWaitSeconds, type Starts } from '../flow/edit'
 import { drillToFlow } from '../flow/import'
 import { appendRun, pathEnd, removeRun, setRunPoints } from '../flow/pathEdit'
+import { addPickup, bestPickup, looseSpots, pickupZones, removePickup, type LooseSpot } from '../flow/pickupEdit'
 import { addPass, believable, endMarker, explain, followers, landingZones, locateOnPath, removePass, snapToLanding } from '../flow/passEdit'
 import { pointAlong } from '../engine/geometry'
 import { buildTimelineModel, firstPossession, mergedFlights, NO_PUCK_MESSAGE, puckCarriedBy, whyNoPuck } from '../flow/view'
@@ -21,6 +22,7 @@ import { libraryDrills } from '../library/drills'
 import { Player } from '../player/Player'
 import { ActorPanel } from './ActorPanel'
 import { PassPanel } from './PassPanel'
+import { PickupPanel } from './PickupPanel'
 import { PiecePanel } from './PiecePanel'
 import { deleteDraft, loadDraft } from './drafts'
 import { DetailsPanel } from './DetailsPanel'
@@ -73,6 +75,9 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
   const [mode, setMode] = useState<'steps' | 'flow'>(() => (drillToFlow(drill) ? 'flow' : 'steps'))
   // A pass being linked in the flow view, after its first click (where it leaves).
   const [passDraft, setPassDraft] = useState<{ puck: string; from: Marker | After; carrier: string; time: number; point: Point } | null>(null)
+  // The pickup tool in the flow view: is it chosen, and once the loose puck is clicked, which one.
+  const [pickupTool, setPickupTool] = useState(false)
+  const [pickupDraft, setPickupDraft] = useState<LooseSpot | null>(null)
   // The drill as it was when a timeline drag began: every step of the drag is
   // worked out from it, so the result depends only on where the pointer is now.
   const dragBase = useRef<Drill | null>(null)
@@ -104,12 +109,23 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
   const model = useMemo(() => buildTimelineModel(drill), [drill])
   // Once a pass's release is chosen: where on the other skaters' paths it could land. A shot goes
   // to the net, so it has none.
-  const zones = useMemo(
+  const zones = useMemo(() => {
+    if (!flow) return []
+    // For a pickup: where on any skater's path the loose puck can be reached.
+    if (pickupDraft) return pickupZones(flow, starts, pickupDraft)
+    return passDraft && routeStyle !== 'shoot'
+      ? landingZones(flow, starts, { point: passDraft.point, time: passDraft.time }, passDraft.carrier)
+      : []
+  }, [flow, starts, passDraft, routeStyle, pickupDraft])
+  // Loose pucks that can be picked up (only worked out while the tool is chosen), and the pickups already made.
+  const spots = useMemo(() => (flow && model && pickupTool ? looseSpots(drill, flow, model) : []), [drill, flow, model, pickupTool])
+  const pickupMarks = useMemo(
     () =>
-      flow && passDraft && routeStyle !== 'shoot'
-        ? landingZones(flow, starts, { point: passDraft.point, time: passDraft.time }, passDraft.carrier)
-        : [],
-    [flow, starts, passDraft, routeStyle],
+      (flow?.pickups ?? []).map((u, index) => {
+        const segs = segmentsFor(flow!.paths[u.marker.actor] ?? [], starts[u.marker.actor])
+        return { index, point: markerPoint(segs, u.marker, starts[u.marker.actor]) }
+      }),
+    [flow, starts],
   )
   const positions = useMemo(() => {
     const at = step !== null && plan?.steps[step] ? plan.steps[step].before.positions : initialState(drill).positions
@@ -128,6 +144,8 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
     setDrawing(null)
     setPassDraft(null)
     setRouteStyle(null)
+    setPickupTool(false)
+    setPickupDraft(null)
   }
   const goTo = (next: number | null) => {
     setView(next)
@@ -223,7 +241,52 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
    * passer's path), then where it lands (on the receiver's path, on a skater, or
    * on the ice). Everything else, the speed included, follows from those.
    */
+  /**
+   * The two clicks that link a pickup: the loose puck, then where on a skater's path they take it.
+   * The second click is snapped into the green stretch nearest it, to the point closest to the
+   * puck, so the skater ends their run right on it.
+   */
+  const onPickupClick = (hit: PassClick) => {
+    if (!flow || !model) return
+    if (!pickupDraft) {
+      if (spots.length === 0) {
+        setMessage('No puck is loose. A puck lies loose when a pass or shot is aimed at a spot with nobody receiving it, or when it starts with no carrier.')
+        return
+      }
+      const aimed = hit.kind === 'ice' ? hit.point : hit.kind === 'path' ? hit.point : undefined
+      const near = (s: LooseSpot) => (aimed ? Math.hypot(s.point[0] - aimed[0], s.point[1] - aimed[1]) : 0)
+      const chosen =
+        hit.kind === 'actor'
+          ? spots.find((s) => s.puck === hit.id)
+          : spots.filter((s) => near(s) <= 6).sort((a, b) => near(a) - near(b))[0]
+      if (!chosen) {
+        setMessage('Click the loose puck: the orange ring.')
+        return
+      }
+      setSelection(null)
+      setPickupDraft(chosen)
+      const reach = pickupZones(flow, starts, chosen)
+      setMessage(
+        reach.length > 0
+          ? ''
+          : 'No skater\'s path reaches that puck after it lands. Draw a run that ends on it first (Esc, then pick a run style), then come back.',
+      )
+      return
+    }
+    if (hit.kind === 'actor') return
+    const snap = bestPickup(zones, pickupDraft, hit.point, 8)
+    if (!snap) {
+      setMessage('Click in the green, on a skater\'s path where it reaches the puck.')
+      return
+    }
+    const draft = pickupDraft
+    stopDrawing()
+    const next = flowEdit((f) => addPickup(f, { puck: draft.puck, marker: snap.marker }, { spot: draft, at: snap.point }))
+    if (next) setSelection({ kind: 'pickup', index: flow.pickups?.length ?? 0 })
+  }
+
   const onPassClick = (hit: PassClick) => {
+    if (pickupTool) return onPickupClick(hit)
     if (!flow || !model || routeStyle === null) return
     const style = routeStyle
 
@@ -393,6 +456,10 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
             flowEdit((f) => removePass(f, selection.link))
             setSelection(null)
           }
+        } else if (selection?.kind === 'pickup') {
+          e.preventDefault()
+          flowEdit((f) => removePickup(f, selection.index))
+          setSelection(null)
         } else if (selection?.kind === 'piece') {
           e.preventDefault()
           const kind = flow?.paths[selection.actor]?.[selection.piece]?.kind
@@ -515,7 +582,7 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
               onSelect={(next) => {
                 setSelection(next)
                 setMessage('')
-                if (next?.kind === 'piece' || next?.kind === 'pass') stopDrawing()
+                if (next?.kind === 'piece' || next?.kind === 'pass' || next?.kind === 'pickup') stopDrawing()
               }}
               onPlace={(at) => {
                 if (!armed) return
@@ -526,10 +593,12 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
               }}
               onActorDrag={(id, to) => editor.preview(moveActor(drill, id, to))}
               onActorDragEnd={editor.endGesture}
-              passTool={releaseTool}
-              passFrom={passDraft?.point ?? null}
+              passTool={releaseTool || pickupTool}
+              passFrom={passDraft?.point ?? pickupDraft?.point ?? null}
               zones={zones}
               onPassClick={onPassClick}
+              pickups={pickupMarks}
+              looseSpots={pickupDraft ? [] : spots}
               onRunStart={(actor) => {
                 const who = drill.actors.find((a) => a.id === actor)
                 if (who?.type === 'puck' || who?.carriedBy) setMessage('Runs are for skaters. A puck moves with whoever carries it, or by a pass.')
@@ -667,6 +736,9 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
                 onApply={(issue, choice) => editor.edit(applySuggestion(drill, issue.location, choice))}
               />
             )}
+            {selection?.kind === 'pickup' && flow && (
+              <PickupPanel key={selection.index} flow={flow} starts={starts} index={selection.index} onEdit={(edit) => flowEdit(edit)} />
+            )}
             {selection?.kind === 'pass' && <PassPanel key={selection.link} drill={drill} link={selection.link} onEdit={(edit) => flowEdit(edit)} />}
             {selection?.kind === 'piece' && (
               <PiecePanel key={`${selection.actor}-${selection.piece}`} drill={drill} actor={selection.actor} piece={selection.piece} onEdit={(edit) => flowEdit(edit)} />
@@ -690,9 +762,22 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
                   drawing={drawing !== null || passDraft !== null}
                   noPuck={!drill.actors.some((a) => a.type === 'puck')}
                   flow
+                  pickup={{
+                    armed: pickupTool,
+                    puckChosen: pickupDraft !== null,
+                    onToggle: () => {
+                      const on = !pickupTool
+                      stopDrawing()
+                      setSelection(null)
+                      setMessage('')
+                      setPickupTool(on)
+                    },
+                  }}
                   onArm={(s) => {
                     setRouteStyle(s)
                     setDrawing(null)
+                    setPickupTool(false)
+                    setPickupDraft(null)
                     setMessage('')
                   }}
                 />

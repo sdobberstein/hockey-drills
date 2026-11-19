@@ -55,6 +55,10 @@ interface Props {
   /** Stretches of other skaters' paths where that pass could land, drawn in green to aim at. */
   zones: readonly { actor: string; points: readonly Point[] }[]
   onPassClick: (click: PassClick) => void
+  /** Pickups already in the drill, drawn as a ring where the skater takes the puck. */
+  pickups: readonly { index: number; point: Point }[]
+  /** While the pickup tool is chosen: the loose pucks that can still be picked up. */
+  looseSpots: readonly { puck: string; point: Point }[]
   onDrawPoint: (at: Point, onActor?: string) => void
   onFinishDrawing: () => void
   onVertex: (grab: VertexGrab, to: Point, phase: StagePhase) => void
@@ -167,6 +171,14 @@ export function FlowStage(props: Props) {
         )
       })}
 
+      {/* Loose pucks waiting to be picked up, marked so there is something to click. */}
+      {props.looseSpots.map((s) => (
+        <g key={`l-${s.puck}-${s.point[0]}-${s.point[1]}`} pointerEvents="none" fill="none" stroke="#b3541e" strokeWidth={0.5}>
+          <circle cx={s.point[0]} cy={s.point[1]} r={3} strokeDasharray="1.2 0.9" />
+          <circle cx={s.point[0]} cy={s.point[1]} r={0.9} fill="#b3541e" stroke="#fff" strokeWidth={0.3} />
+        </g>
+      ))}
+
       {/* Where the pass being linked could land: a soft wide band to aim at, with a clear line down the middle. */}
       {zones.map((z, i) => (
         <g key={`z${i}`} pointerEvents="none" fill="none" strokeLinecap="round" strokeLinejoin="round">
@@ -207,6 +219,29 @@ export function FlowStage(props: Props) {
           <circle cx={passFrom[0]} cy={passFrom[1]} r={1.3} fill="#b3541e" stroke="#fff" strokeWidth={0.4} />
         </g>
       )}
+
+      {/* Where each skater takes a loose puck: a ring on their path, clickable to select it. */}
+      {props.pickups.map((u) => {
+        const chosen = selection?.kind === 'pickup' && selection.index === u.index
+        return (
+          <g key={`u${u.index}`}>
+            <circle cx={u.point[0]} cy={u.point[1]} r={2} fill="#fff" fillOpacity={0.6} stroke={chosen ? ACCENT : '#b3541e'} strokeWidth={chosen ? 0.7 : 0.5} />
+            <circle cx={u.point[0]} cy={u.point[1]} r={0.7} fill={chosen ? ACCENT : '#b3541e'} pointerEvents="none" />
+            <circle
+              cx={u.point[0]}
+              cy={u.point[1]}
+              r={3}
+              fill="transparent"
+              pointerEvents={busy ? 'none' : 'all'}
+              style={{ cursor: 'pointer' }}
+              onPointerDown={(e) => {
+                e.stopPropagation()
+                props.onSelect({ kind: 'pickup', index: u.index })
+              }}
+            />
+          </g>
+        )
+      })}
 
       {/* A halo under the selected run. */}
       {selectedSeg && selectedRun && (
@@ -304,7 +339,9 @@ export function FlowStage(props: Props) {
                 return
               }
               if (passTool) {
-                props.onPassClick({ kind: 'actor', id: actor.id })
+                // A puck someone is carrying is drawn just in front of them, so a click on it means
+                // them: it is the natural thing to click when you want to pass it.
+                props.onPassClick({ kind: 'actor', id: actor.carriedBy ?? actor.id })
                 return
               }
               if (routeTool) {

@@ -26,6 +26,8 @@ interface Props {
   noPuck?: boolean
   /** Describe the second click: in the flow view a run is added to the end of a skater's path. */
   flow?: boolean
+  /** The pickup tool (flow view only): is it chosen, has a puck been chosen, and a way to turn it on or off. */
+  pickup?: { armed: boolean; puckChosen: boolean; onToggle: () => void }
 }
 
 function StyleButtons({ styles, armed, onArm }: { styles: readonly MoveStyle[]; armed: MoveStyle | null; onArm: Props['onArm'] }) {
@@ -50,7 +52,7 @@ function StyleButtons({ styles, armed, onArm }: { styles: readonly MoveStyle[]; 
 }
 
 /** Choose a line style, then click an actor and click out its route. */
-export function RouteTools({ armed, drawing, onArm, releases = true, flow = false, noPuck = false }: Props) {
+export function RouteTools({ armed, drawing, onArm, releases = true, flow = false, noPuck = false, pickup }: Props) {
   const releasing = armed !== null && RELEASE_STYLES.includes(armed)
   return (
     <>
@@ -58,6 +60,23 @@ export function RouteTools({ armed, drawing, onArm, releases = true, flow = fals
         <h3>Draw a route</h3>
         <StyleButtons styles={ROUTE_STYLES} armed={armed} onArm={onArm} />
       </section>
+      {pickup && (
+        <section>
+          <h3>Pick up a loose puck</h3>
+          <div className="routes">
+            <button type="button" aria-pressed={pickup.armed} className={pickup.armed ? 'active' : undefined} onClick={pickup.onToggle}>
+              Pick up
+            </button>
+          </div>
+          <p className="hint">
+            {!pickup.armed
+              ? 'For a dump-in: pass or shoot the puck to a spot with nobody receiving it, then have a skater run there. Choose this, then click the loose puck.'
+              : pickup.puckChosen
+                ? 'Green marks where on the skaters\' paths they can reach it. Click in the green. Esc cancels.'
+                : 'Click the loose puck (the orange ring). Esc cancels.'}
+          </p>
+        </section>
+      )}
       {releases ? (
         <section>
           <h3>Pass or shoot</h3>

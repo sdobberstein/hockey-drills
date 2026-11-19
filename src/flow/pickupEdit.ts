@@ -19,12 +19,22 @@ import type { TimelineModel } from './view'
  */
 export const PICKUP_REACH = 2
 
+/**
+ * How far from a dumped puck a skater's path may pass and still be offered. Farther than
+ * PICKUP_REACH, so choosing the pickup moves where the dump lands onto the skater (see
+ * addPickup): "into the corner" does not mean a particular square foot, and nobody should have to
+ * draw two lines within two feet of each other by eye.
+ */
+export const PICKUP_NEAR = 8
+
 /** A puck lying loose: which one, where, and from when. */
 export interface LooseSpot {
   puck: string
   point: Point
   /** When it stopped moving (seconds): a skater has to arrive after this. */
   since: number
+  /** The pass or shot (index in flow.events) that left it here; it can be moved. Absent for a puck that starts loose. */
+  event?: number
 }
 
 /**
@@ -39,7 +49,10 @@ export function looseSpots(drill: Drill, flow: Flow, model: TimelineModel): Loos
   const add = (puck: string, since: number) => {
     if (found.some((s) => s.puck === puck && Math.abs(s.since - since) < 0.01)) return
     const point = timeline.at(since)[puck]
-    if (point) found.push({ puck, point, since })
+    if (!point) return
+    // Which pass or shot left it here, if one did: that is what can be moved onto the skater.
+    const event = model.links.findIndex((l, i) => flow.events[i]?.puck === puck && l.to.actor === null && Math.abs(l.to.t - since) < 0.01)
+    found.push({ puck, point, since, ...(event >= 0 ? { event } : {}) })
   }
   for (const row of model.pucks) {
     // Loose and not flying: it has stopped. (A span that ends the drill's timeline is included.)
@@ -67,6 +80,11 @@ const SAMPLE = 0.25
  */
 export function pickupZones(flow: Flow, starts: Starts, spot: LooseSpot): LandingZone[] {
   const zones: LandingZone[] = []
+  // A dump that will be moved onto the skater lands a touch earlier or later than it does now, so
+  // leave a margin: the skater must clearly arrive after it, not at the same instant.
+  const movable = spot.event !== undefined
+  const radius = movable ? PICKUP_NEAR : PICKUP_REACH
+  const margin = movable ? 0.3 : 0
   for (const [actor, pieces] of Object.entries(flow.paths)) {
     for (const seg of segmentsFor(pieces, starts[actor])) {
       if (seg.piece.kind !== 'run' || seg.length <= 0) continue
@@ -79,7 +97,7 @@ export function pickupZones(flow: Flow, starts: Starts, spot: LooseSpot): Landin
       for (let i = 0; i <= steps; i++) {
         const arc = (seg.length * i) / steps
         const point = pointAlong(seg.geometry, arc)
-        const reaches = arc > 0.05 && seg.t0 + arc / seg.speed >= spot.since - 1e-3 && distance(point, spot.point) <= PICKUP_REACH
+        const reaches = arc > 0.05 && seg.t0 + arc / seg.speed >= spot.since + margin - 1e-3 && distance(point, spot.point) <= radius
         if (reaches) {
           if (!open) open = { from: arc, points: [] }
           open.points.push(point)
@@ -119,8 +137,20 @@ export function bestPickup(zones: readonly LandingZone[], spot: LooseSpot, click
   return { marker: { actor: zone.actor, piece: zone.piece, at: arc }, point: zone.points[best] }
 }
 
-export function addPickup(flow: Flow, pickup: Pickup): Flow {
-  return { ...flow, pickups: [...(flow.pickups ?? []), pickup] }
+/**
+ * Add a pickup. If it was chosen at a spot a little way from the puck (`at`, with the loose
+ * spot it was chosen for), the pass or shot that left the puck there is moved to land on `at`
+ * instead: the skater collects it where their run is, and the puck is there waiting.
+ */
+export function addPickup(flow: Flow, pickup: Pickup, moveDumpTo?: { spot: LooseSpot; at: Point }): Flow {
+  let events = flow.events
+  const index = moveDumpTo?.spot.event
+  if (moveDumpTo && index !== undefined) {
+    events = flow.events.map((e, i) =>
+      i === index && e.target.kind === 'point' ? { ...e, target: { ...e.target, at: [moveDumpTo.at[0], moveDumpTo.at[1]] as Point } } : e,
+    )
+  }
+  return { ...flow, events, pickups: [...(flow.pickups ?? []), pickup] }
 }
 
 export function removePickup(flow: Flow, index: number): Flow {
