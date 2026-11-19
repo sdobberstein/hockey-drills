@@ -425,7 +425,8 @@ export function FlowStage(props: Props) {
               props.onActorDragEnd()
             }}
           >
-            {chosen && <circle r={GRAB_RADIUS - 0.4} fill="none" stroke={ACCENT} strokeWidth={0.5} strokeDasharray="1.2 0.9" />}
+            {/* Only a picture: it must not take clicks, or a selected carried puck's ring would sit over its own carrier. */}
+            {chosen && <circle r={GRAB_RADIUS - 0.4} fill="none" stroke={ACCENT} strokeWidth={0.5} strokeDasharray="1.2 0.9" pointerEvents="none" />}
             <ActorSymbol actor={actor} />
             <circle r={carried ? 1.4 : GRAB_RADIUS} fill="transparent" />
           </g>
