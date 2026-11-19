@@ -10,6 +10,7 @@
   ],
   "rink": "half-right",
   "progression": { "series": "cycle-give-and-go", "order": 2 },
+  "source": { "url": "https://weisstechhockey.com/cycle-give-and-go-drill/", "title": "Cycle Give and Go Drill", "author": "Jeremy Weiss", "site": "Weiss Tech Hockey" },
   "actors": [
     { "id": "F1", "type": "forward", "label": "1", "start": [188, 80] },
     { "id": "F2", "type": "forward", "label": "2", "start": [125, 80] },
