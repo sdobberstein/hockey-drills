@@ -212,6 +212,12 @@ export function compileFlow(drill: Drill, flow: Flow): Compiled {
   }
   const boundaries = kept.map((m) => m.t)
 
+  // The last moment anything happens: a run ends, a pass lands, a pickup. Standing after it is "trailing".
+  let lastActive = 0
+  for (const list of segs.values()) for (const s of list) if (s.piece.kind === 'run') lastActive = Math.max(lastActive, s.t1)
+  for (const r of resolved) lastActive = Math.max(lastActive, r.tLand)
+  for (const u of pickups) lastActive = Math.max(lastActive, u.t)
+
 
   // --- cut every path at the boundaries ---------------------------------------
   const steps: Step[] = []
@@ -254,6 +260,10 @@ export function compileFlow(drill: Drill, flow: Flow): Compiled {
     if (phase?.name) name = phase.name
 
     if (moves.length === 0) {
+      // Standing still at the very end is not worth a warning: nothing follows it, so dropping it
+      // changes nothing anyone would see. It is what is left when the pass someone was waiting for
+      // is deleted. A gap with movement after it is different (see below), and still reported.
+      if (a >= lastActive - MERGE) continue
       problems.push({ code: 'nobody-moves', time: a, message: `Nobody moves from ${a.toFixed(2)} s to ${c.toFixed(2)} s, so there is no step for it; that time is removed.` })
       continue
     }
