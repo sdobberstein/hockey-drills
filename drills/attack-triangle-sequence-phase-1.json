@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "id": "attack-triangle-sequence-phase-1",
+  "title": "Attack Triangle Sequence: Phase 1",
+  "description": "F1 leaves without the puck, cuts across the neutral zone and receives a pass in stride from the first player in the other line, then drives wide around the cones and shoots. After making the pass, the first player in the other line repeats the same sequence.",
+  "tags": [
+    "offence",
+    "passing",
+    "shooting",
+    "team systems"
+  ],
+  "rink": "full",
+  "progression": { "series": "attack-triangle-sequence", "order": 1 },
+  "source": {
+    "url": "https://weisstechhockey.com/attack-triangle-sequence/",
+    "title": "Attack Triangle Sequence",
+    "author": "Jeremy Weiss",
+    "site": "Weiss Tech Hockey"
+  },
+  "actors": [
+    { "id": "pucksTop", "type": "pucks", "start": [62, 4] },
+    { "id": "pucksBottom", "type": "pucks", "start": [62, 81] },
+    { "id": "cone1", "type": "pylon", "start": [80, 20] },
+    { "id": "cone2", "type": "pylon", "start": [120, 20] },
+    { "id": "cone3", "type": "pylon", "start": [80, 64.5] },
+    { "id": "cone4", "type": "pylon", "start": [120, 65] },
+    { "id": "P", "type": "forward", "start": [68, 6] },
+    { "id": "F1", "type": "forward", "start": [68, 80] },
+    { "id": "puck", "type": "puck", "start": [68, 6], "carriedBy": "P" }
+  ],
+  "steps": [
+    {
+      "moves": [
+        { "actor": "F1", "style": "skate", "points": [[68, 80], [81.26305407633701, 61.8247036731678]] }
+      ],
+      "name": "Cut across the neutral zone",
+      "notes": "F1 leaves without the puck and cuts across the neutral zone."
+    },
+    {
+      "moves": [
+        { "actor": "F1", "style": "skate", "points": [[81.26305407633701, 61.8247036731678], [95, 43]] },
+        { "actor": "puck", "style": "pass", "to": [95, 43], "speed": 49.1, "receiver": "F1" }
+      ],
+      "name": "Pass in stride",
+      "notes": "The first player in the other line passes to F1 as F1 crosses centre ice. No stopping."
+    },
+    {
+      "moves": [
+        {
+          "actor": "F1",
+          "style": "skate-puck",
+          "points": [[95, 43], [101, 28], [110, 14], [124, 10.5], [142, 13], [154, 20], [158, 26]],
+          "smooth": true
+        }
+      ],
+      "name": "Drive wide",
+      "notes": "F1 receives the pass in stride and carries the puck wide around the cones."
+    },
+    {
+      "moves": [
+        { "actor": "puck", "style": "shoot", "to": [189, 42.5] }
+      ],
+      "name": "Shoot",
+      "notes": "F1 drives wide and shoots. After passing, the first player in the other line repeats the sequence."
+    }
+  ]
+}
