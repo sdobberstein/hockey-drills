@@ -91,6 +91,10 @@
           "type": "string",
           "description": "Actor that picks the puck up when a release ends. Implied when `to` is an actor id."
         },
+        "picksUp": {
+          "type": "string",
+          "description": "Id of a loose puck this skater picks up when the move ends. The puck must be loose by then and within about 2.5 ft of where the move ends."
+        },
         "continues": {
           "type": "boolean",
           "description": "Carries on a pass or shot already in the air from an earlier step. The puck is loose when this step begins; `receiver` goes on the last stretch only."

@@ -50,6 +50,8 @@ export type IssueCode =
   | 'continues-while-carried'
   | 'carried-actor-moves'
   | 'receiver-misses-pass'
+  | 'pickup-not-loose'
+  | 'pickup-misses-puck'
 
 /** How far (feet) a path's first point may be from where the actor is. */
 export const PATH_START_TOLERANCE = 0.5
@@ -115,6 +117,13 @@ function checkReferences(drill: Drill): Issue[] {
         })
       }
       movers.add(move.actor)
+      if (move.picksUp !== undefined && actors.get(move.picksUp)?.type !== 'puck') {
+        issues.push({
+          code: 'unknown-target',
+          message: `Move says "${move.actor}" picks up "${move.picksUp}", which is not a puck in this drill.`,
+          location: `steps[${si}].moves[${mi}]`,
+        })
+      }
       if (move.receiver !== undefined && !actors.has(move.receiver)) {
         issues.push({
           code: 'unknown-target',
@@ -155,6 +164,44 @@ function checkState(drill: Drill): Issue[] {
           message: `"${move.actor}" is at [${here}] but its path starts at [${move.path[0]}].`,
           location,
         })
+      }
+
+      if (move.picksUp) {
+        // Where the puck is lying when this skater's move ends, and whether it is free to take.
+        // In the same step the puck may be flying (it must have landed first, with nobody named to
+        // receive it) or carried (someone has it); from an earlier step it simply sits.
+        const puckMove = step.moves.find((m) => m.actor === move.picksUp)
+        const holder = step.before.carriers.get(move.picksUp)
+        let lying: Point | undefined
+        if (puckMove?.receiver) {
+          issues.push({
+            code: 'pickup-not-loose',
+            message: `"${move.picksUp}" is passed to ${puckMove.receiver} in this step, so ${move.actor} cannot pick it up too.`,
+            location,
+          })
+        } else if (puckMove && puckMove.duration > move.duration + 1e-6) {
+          issues.push({
+            code: 'pickup-not-loose',
+            message: `${move.actor} gets there after ${move.duration.toFixed(2)}s but "${move.picksUp}" is still in the air until ${puckMove.duration.toFixed(2)}s. Put the pickup in a later step, or slow ${move.actor} down.`,
+            location,
+          })
+        } else if (!puckMove && holder) {
+          issues.push({
+            code: 'pickup-not-loose',
+            message: `${holder} is carrying "${move.picksUp}" at this point, so ${move.actor} cannot pick it up. Pass or shoot it first.`,
+            location,
+          })
+        } else {
+          lying = puckMove ? puckMove.path[puckMove.path.length - 1] : step.before.positions.get(move.picksUp)
+        }
+        const reach = move.path[move.path.length - 1]
+        if (lying && distance(lying, reach) > RECEIVE_TOLERANCE) {
+          issues.push({
+            code: 'pickup-misses-puck',
+            message: `${move.actor} finishes at [${fmt(reach)}] but "${move.picksUp}" is lying at [${fmt(lying)}], ${distance(lying, reach).toFixed(1)} ft away. End ${move.actor}'s run on the puck.`,
+            location,
+          })
+        }
       }
 
       if (move.releases) {

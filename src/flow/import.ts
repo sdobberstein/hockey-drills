@@ -28,6 +28,9 @@ export function drillToFlow(drill: Drill): Flow | null {
   // The planner tolerates a move by someone who is not in the drill; a flow cannot.
   const known = new Set(drill.actors.map((a) => a.id))
   if (drill.steps.some((s) => s.moves.some((m) => !known.has(m.actor)))) return null
+  // The flow model has no way to say "picks up a loose puck" yet. Refuse rather than import the
+  // drill and silently lose the pickup the next time it is edited; the Steps view still works.
+  if (drill.steps.some((s) => s.moves.some((m) => m.picksUp))) return null
   const startOf = (id: string): Point => drill.actors.find((a) => a.id === id)!.start
 
   // 1. Each actor's runs, with a wait wherever they were idle between them.

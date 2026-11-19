@@ -88,6 +88,8 @@ function frameAt(plan: Plan, t: number): Frame {
 
   const moving = new Map<string, PlannedMove>(step.moves.map((m) => [m.actor, m]))
   const frame: Frame = {}
+  const pickups = new Map<string, PlannedMove>()
+  for (const m of step.moves) if (m.picksUp) pickups.set(m.picksUp, m)
 
   // Resolve one actor at a time. Carried actors defer to their carrier, which
   // is always a single hop because the validator forbids carrier chains.
@@ -111,6 +113,11 @@ function frameAt(plan: Plan, t: number): Frame {
       const carrier = step.before.carriers.get(id)
       position = carrier ? resolve(carrier) : step.before.positions.get(id)!
     }
+    // A loose puck is collected when a skater's move with `picksUp` ends: until then it sits (or
+    // flies) where it is, and from then on it rides that skater. Checked last so it overrides
+    // wherever the puck would otherwise have been.
+    const picker = pickups.get(id)
+    if (picker && elapsed >= picker.duration) position = resolve(picker.actor)
     frame[id] = position
     return position
   }

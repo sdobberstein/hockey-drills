@@ -70,6 +70,14 @@ interface MoveBase {
    */
   receiver?: string
   /**
+   * Puck this skater picks up when the move ends. The puck has to be loose by
+   * then (a pass or shot that nobody received, or one still lying where it
+   * landed) and within reach of where the move ends. This is how a dump-in
+   * gets retrieved: the puck sits in the corner, and a skater's run finishes
+   * there. Set on the skater's move, not the puck's.
+   */
+  picksUp?: string
+  /**
    * This move carries on a pass or shot that began in an earlier step: the puck
    * is already in the air, and this is the next stretch of the same flight.
    * A step holds all the moves in it, so a flight that lasts longer than one

@@ -43,6 +43,8 @@ export interface PlannedMove {
   continues?: boolean
   /** Actor that picks the puck up on arrival. */
   receiver?: string
+  /** A loose puck this skater takes when the move ends. */
+  picksUp?: string
 }
 
 export interface PlannedStep {
@@ -110,6 +112,7 @@ export function planDrill(drill: Drill): Plan {
         // lead pass names its receiver explicitly.
         receiver: releases ? (move.receiver ?? (typeof move.to === 'string' ? move.to : undefined)) : undefined,
         ...(move.continues ? { continues: true } : {}),
+        ...(move.picksUp ? { picksUp: move.picksUp } : {}),
       }
     })
 
@@ -118,6 +121,9 @@ export function planDrill(drill: Drill): Plan {
       positions.set(m.actor, m.path[m.path.length - 1])
       if (m.releases) carriers.delete(m.actor)
       if (m.receiver) carriers.set(m.actor, m.receiver)
+      // A pickup happens when the skater's own move ends, so the puck is theirs for the next
+      // step. (Within this step it rides them from that moment; see frameAt in timeline.ts.)
+      if (m.picksUp) carriers.set(m.picksUp, m.actor)
     }
     syncCarried(positions, carriers)
 
