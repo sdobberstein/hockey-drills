@@ -233,7 +233,7 @@ export function puckCarriedBy(model: TimelineModel, actor: string, t: number, sl
 
 /** Said when a drill has no puck at all, which "skate with puck" (only a line style) does not give it. */
 export const NO_PUCK_MESSAGE =
-  'This drill has no puck yet. “Skate with puck” is only a line style. Add a real puck under “Add to the ice”, then set who carries it.'
+  'This drill has no puck yet. Add one under “Add to the ice”, then set who carries it.'
 
 /**
  * Why a skater does not have the puck at a moment, in words that say what to do.

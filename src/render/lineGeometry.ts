@@ -140,7 +140,7 @@ const line = (points: Point[], extra: Partial<Stroke> = {}): Stroke => ({ points
  * The strokes that draw one move in International Drill Symbols notation.
  * See PLAN.md, "Symbol set", for what each style means.
  */
-export function lineArt(style: MoveStyle, path: readonly Point[]): Stroke[] {
+export function lineArt(style: MoveStyle, path: readonly Point[], options: { arrow?: boolean } = {}): Stroke[] {
   const points = dedupe(path)
   if (points.length < 2) return []
 
@@ -149,14 +149,16 @@ export function lineArt(style: MoveStyle, path: readonly Point[]): Stroke[] {
   const head = line(arrowHead(end.point, end.tangent))
 
   switch (style) {
+    // `arrow: false` leaves the head off a stretch that is only part of a longer run, so the run
+    // has one arrowhead, at its end, even when it is drawn in pieces.
     case 'skate':
-      return [line(points), head]
+      return options.arrow === false ? [line(points)] : [line(points), head]
 
     case 'backward':
       return [line(wavePoints(points, 2.2, 0.6)), head]
 
     case 'skate-puck':
-      return [line(wavePoints(points, 7, 1.2)), head]
+      return options.arrow === false ? [line(wavePoints(points, 7, 1.2))] : [line(wavePoints(points, 7, 1.2)), head]
 
     case 'lateral': {
       // A ladder of ticks across the path, stopping short of the arrowhead.

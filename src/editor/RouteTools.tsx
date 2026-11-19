@@ -58,7 +58,8 @@ export function RouteTools({ armed, drawing, onArm, releases = true, flow = fals
     <>
       <section>
         <h3>Draw a route</h3>
-        <StyleButtons styles={ROUTE_STYLES} armed={armed} onArm={onArm} />
+        {/* In the flow view forward skating is drawn with the puck by itself while the skater has it, so there is nothing to choose. */}
+        <StyleButtons styles={flow ? ROUTE_STYLES.filter((s) => s !== 'skate-puck') : ROUTE_STYLES} armed={armed} onArm={onArm} />
       </section>
       {pickup && (
         <section>
@@ -82,8 +83,10 @@ export function RouteTools({ armed, drawing, onArm, releases = true, flow = fals
           <h3>Pass or shoot</h3>
           {noPuck && (
             <p className="notice" role="note">
-              There is no puck in this drill yet, so there is nothing to pass or shoot. “Skate with puck” is only a line style: add a puck under
-              “Add to the ice” and set who carries it.
+              There is no puck in this drill yet, so there is nothing to pass or shoot.{' '}
+              {flow
+                ? 'Add a puck under “Add to the ice” and set who carries it.'
+                : '“Skate with puck” is only a line style: add a puck under “Add to the ice” and set who carries it.'}
             </p>
           )}
           <StyleButtons styles={RELEASE_STYLES} armed={armed} onArm={onArm} />

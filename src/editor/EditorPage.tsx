@@ -124,6 +124,14 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
   }, [flow, starts, passDraft, routeStyle, pickupDraft])
   // Loose pucks that can be picked up (only worked out while the tool is chosen), and the pickups already made.
   const spots = useMemo(() => (flow && model && pickupTool ? looseSpots(drill, flow, model) : []), [drill, flow, model, pickupTool])
+  // When each skater holds the puck, from the puck's timeline: it is what makes forward skating draw with-puck.
+  const holding = useMemo(() => {
+    const out: Record<string, { t0: number; t1: number }[]> = {}
+    for (const row of model?.pucks ?? []) {
+      for (const span of row.spans) if (span.carrier) (out[span.carrier] ??= []).push({ t0: span.t0, t1: span.t1 })
+    }
+    return out
+  }, [model])
   const pickupMarks = useMemo(
     () =>
       (flow?.pickups ?? []).map((u, index) => {
@@ -630,6 +638,7 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
               zones={zones}
               onPassClick={onPassClick}
               pickups={pickupMarks}
+              holding={holding}
               looseSpots={pickupDraft ? [] : spots}
               onRunStart={(actor) => {
                 const who = drill.actors.find((a) => a.id === actor)

@@ -3,6 +3,7 @@ import { initialState } from '../engine/plan'
 import type { Heading } from '../engine/timeline'
 import type { ActorType, Drill, MoveStyle, Point } from '../engine/types'
 import type { Starts } from '../flow/edit'
+import { carryStretches } from '../flow/carry'
 import { segmentsFor, type Segment } from '../flow/timeline'
 import type { Flow } from '../flow/types'
 import { ActorSymbol } from '../render/ActorSymbol'
@@ -69,6 +70,8 @@ interface Props {
   onPassClick: (click: PassClick) => void
   /** Pickups already in the drill, drawn as a ring where the skater takes the puck. */
   pickups: readonly { index: number; point: Point }[]
+  /** When each skater holds the puck, so forward skating is drawn with-puck exactly then. */
+  holding: Readonly<Record<string, readonly { t0: number; t1: number }[]>>
   /** While the pickup tool is chosen: the loose pucks that can still be picked up. */
   looseSpots: readonly { puck: string; point: Point }[]
   onDrawPoint: (at: Point, onActor?: string) => void
@@ -224,7 +227,14 @@ export function FlowStage(props: Props) {
         list.map((seg) =>
           seg.piece.kind === 'run' ? (
             <g key={`${actor}-${seg.index}`}>
-              <MoveLine style={seg.piece.style} path={seg.geometry} opacity={0.9} />
+              {seg.piece.style === 'skate' ? (
+                // Forward skating is drawn with the puck wherever the skater has it, and plain elsewhere.
+                carryStretches(seg.geometry, seg, props.holding[actor] ?? []).map((s, i, all) => (
+                  <MoveLine key={i} style={s.carrying ? 'skate-puck' : 'skate'} path={s.points} opacity={0.9} arrow={i === all.length - 1} />
+                ))
+              ) : (
+                <MoveLine style={seg.piece.style} path={seg.geometry} opacity={0.9} />
+              )}
               <polyline
                 points={pointsAttr(seg.geometry)}
                 fill="none"

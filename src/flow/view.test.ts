@@ -90,7 +90,7 @@ describe('why a skater has no puck', () => {
     const d = userLike()
     const msg = whyNoPuck(d, buildTimelineModel(d)!, 'F1', 1)
     expect(msg).toBe(NO_PUCK_MESSAGE)
-    expect(msg).toContain('only a line style')
+    expect(msg).toContain('no puck yet')
   })
 
   it('says who does have it, when someone else does', () => {
