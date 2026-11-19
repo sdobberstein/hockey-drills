@@ -230,6 +230,14 @@ export function compileFlow(drill: Drill, flow: Flow): Compiled {
   for (const u of pickups) lastActive = Math.max(lastActive, u.t)
 
 
+  // The step each release (and each phase name) belongs to: the one whose boundary is nearest. Asking
+  // "is this boundary within the merge tolerance of it?" instead is wrong when two boundaries that
+  // are just too far apart to merge each fall within it of the same release: both would claim it,
+  // and a pass would be let go twice.
+  const nearestBoundary = (t: number) => boundaries.reduce((best, b, i) => (Math.abs(b - t) < Math.abs(boundaries[best] - t) ? i : best), 0)
+  const releaseStep = resolved.map((r) => nearestBoundary(r.tRel))
+  const phaseStep = (flow.phases ?? []).map((p) => nearestBoundary(p.start))
+
   // --- cut every path at the boundaries ---------------------------------------
   const steps: Step[] = []
   for (let k = 0; k + 1 < boundaries.length; k++) {
@@ -263,14 +271,17 @@ export function compileFlow(drill: Drill, flow: Flow): Compiled {
     }
 
     let name: string | undefined
-    for (const r of resolved) {
-      const move = emitFlight(r, a, c)
-      if (!move) continue
+    resolved.forEach((r, ri) => {
+      const first = k === releaseStep[ri]
+      // In the air from the release step until it lands.
+      const inAir = first || (k > releaseStep[ri] && r.tLand > a + MERGE)
+      const move = inAir ? emitFlight(r, a, c, first) : null
+      if (!move) return
       moves.push(move)
-      if (Math.abs(r.tRel - a) <= MERGE) name ??= r.event.name
-    }
+      if (first) name ??= r.event.name
+    })
     // A phase that starts here names the step (and wins over an event's own name).
-    const phase = (flow.phases ?? []).find((p) => Math.abs(p.start - a) <= MERGE)
+    const phase = (flow.phases ?? []).find((_, pi) => phaseStep[pi] === k)
     if (phase?.name) name = phase.name
 
     if (moves.length === 0) {
@@ -341,21 +352,17 @@ function emitRun(actor: string, seg: Segment, tA: number, tB: number, carries: b
 }
 
 /**
- * The part of a pass or shot that is in the air during the step from `a` to `c`,
- * or null if it is not. The release (the step it starts in) leaves the carrier;
- * every later step it is still in the air gets a `continues` stretch from where the
- * last one ended; `receiver` goes on the last. Where it fits in one step this is
- * the whole flight, exactly as before.
+ * The move for the part of a pass or shot that is in the air during the step from `a` to `c`. The
+ * caller has decided that it is, and whether this is the step it is released in (`first`). The
+ * release leaves the carrier; every later step it is still in the air gets a `continues` stretch
+ * from where the last one ended; `receiver` goes on the last. Where it fits in one step this is the
+ * whole flight. Null only if the stretch has no length.
  *
  * The flight is cut by arc length at the speed it is flying, so every stretch lasts
  * exactly as long as its step.
  */
-function emitFlight(r: Resolved, a: number, c: number): Move | null {
+function emitFlight(r: Resolved, a: number, c: number, first: boolean): Move | null {
   const { event, route, speed, receiver } = r
-  const first = Math.abs(r.tRel - a) <= MERGE
-  const inAir = first || (r.tRel < a - MERGE && r.tLand > a + MERGE)
-  if (!inAir) return null
-
   const last = r.tLand <= c + MERGE
   const total = pathLength(route)
   const s0 = first ? 0 : Math.min(Math.max((a - r.tRel) * speed, 0), total)

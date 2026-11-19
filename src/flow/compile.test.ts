@@ -301,3 +301,28 @@ describe('a run that a step covers to within the merge tolerance', () => {
     expect(move.points).toHaveLength(3)
   })
 })
+
+describe('boundaries a few milliseconds either side of a release', () => {
+  // F1 carries along y = 20 at 25 ft/s and lets the puck go 40 ft in (1.6 s). F2 finishes its run 4 ms
+  // before that and F3 starts running 4 ms after. Each boundary is within the 5 ms merge tolerance of
+  // the release, but they are 8 ms apart so they are not merged with each other, and a run that starts
+  // is never tidied away. Both used to think they were the step the pass leaves in, so it was let go
+  // twice, and the second time nobody had the puck.
+  it('release the pass once, in the step nearest it', () => {
+    const d = base()
+    d.actors = [...d.actors, { id: 'F3', type: 'forward', start: [50, 75] }]
+    const f: Flow = {
+      paths: {
+        F1: [{ kind: 'run', style: 'skate', speed: 25, points: [[50, 20], [120, 20]] }],
+        F2: [{ kind: 'run', style: 'skate', speed: 25, points: [[50, 60], [50 + 1.596 * 25, 60]] }],
+        F3: [{ kind: 'wait', seconds: 1.604 }, { kind: 'run', style: 'skate', speed: 25, points: [[50, 75], [100, 75]] }],
+      },
+      events: [{ puck: 'puck', style: 'pass', from: { actor: 'F1', piece: 0, at: 40 }, target: { kind: 'point', at: [100, 40] } }],
+    }
+    const { drill, problems } = compileFlow(d, f)
+    expect(problems).toEqual([])
+    expect(validateDrill(drill)).toEqual([])
+    const passes = drill.steps.flatMap((s) => s.moves).filter((m) => m.actor === 'puck')
+    expect(passes.filter((m) => !m.continues)).toHaveLength(1)
+  })
+})
