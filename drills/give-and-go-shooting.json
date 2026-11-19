@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "id": "give-and-go-shooting",
+  "title": "Give and Go Shooting",
+  "description": "A half-ice drill that mimics a situation that happens again and again in games: players learn to read the pressure, get a pass back to the corner, and execute a give-and-go. The first player passes out to the point man, then attacks. The point man bank passes back to the next player in line, who executes a give and go with the point man, and the point man shoots. The player who attacked becomes the new point man. Key points: read and react, give and go, quick shots.",
+  "tags": [
+    "passing",
+    "shooting",
+    "offence"
+  ],
+  "rink": "half-left",
+  "source": {
+    "url": "https://weisstechhockey.com/give-and-go-shooting-drill/",
+    "title": "Give and Go Shooting Drill",
+    "author": "Jeremy Weiss",
+    "site": "Weiss Tech Hockey"
+  },
+  "actors": [
+    { "id": "F3", "type": "forward", "start": [2, 10] },
+    { "id": "F2", "type": "forward", "start": [5, 8] },
+    { "id": "F1", "type": "forward", "start": [9, 4] },
+    { "id": "P", "type": "forward", "start": [77, 5] },
+    { "id": "puck", "type": "puck", "start": [9, 4], "carriedBy": "F1" }
+  ],
+  "steps": [
+    {
+      "moves": [
+        { "actor": "F1", "style": "skate-puck", "points": [[9, 4], [29, 5]] }
+      ],
+      "name": "First player out",
+      "notes": "The first player carries the puck out of the corner along the boards."
+    },
+    {
+      "moves": [
+        { "actor": "F1", "style": "skate", "points": [[29, 5], [31, 7.5], [52.792684847071044, 7.437735186151226]] },
+        { "actor": "puck", "style": "pass", "to": [77, 5], "speed": 48, "receiver": "P" }
+      ],
+      "name": "Pass out, then attack",
+      "notes": "The first player passes out to the point man, then attacks: skates out to pressure the point man."
+    },
+    {
+      "moves": [
+        { "actor": "F1", "style": "skate", "points": [[52.792684847071044, 7.437735186151226], [66, 7.4]] },
+        {
+          "actor": "puck",
+          "style": "pass",
+          "points": [[77, 5], [38, 0], [37.59535325004603, 0.06474347999263465]],
+          "speed": 69.7
+        }
+      ],
+      "name": "Bank pass back",
+      "notes": "The point man reads the pressure and bank passes off the boards back to the next player in line."
+    },
+    {
+      "moves": [
+        { "actor": "F2", "style": "skate", "points": [[5, 8], [12.826237921249266, 4.086881039375367]] },
+        {
+          "actor": "puck",
+          "style": "pass",
+          "to": [13.506739034438006, 3.91892175448992],
+          "speed": 69.7,
+          "continues": true
+        }
+      ]
+    },
+    {
+      "moves": [
+        {
+          "actor": "F2",
+          "style": "skate",
+          "points": [[12.826237921249266, 4.086881039375367], [12.999999999999998, 4.000000000000001]]
+        },
+        { "actor": "P", "style": "skate", "points": [[77, 5], [76.94965941683793, 5.1876363522924684]] },
+        {
+          "actor": "puck",
+          "style": "pass",
+          "to": [13.000000000000004, 4],
+          "speed": 69.7,
+          "receiver": "F2",
+          "continues": true
+        }
+      ]
+    },
+    {
+      "moves": [
+        {
+          "actor": "P",
+          "style": "skate",
+          "points": [[76.94965941683793, 5.1876363522924684], [76.76529545901563, 5.874823078529099], [76.5524415737679, 6.749393412099766], [76.34832795081479, 7.623862647687063], [76.13984419671438, 8.498382432266045], [75.91387991802466, 9.37310441281177], [75.65732472130367, 10.2481802362993], [75.35706821310944, 11.123761549703689], [75, 12], [74.62684736240097, 12.807379451196171], [74.21905370575263, 13.628921103315347], [73.77903879866507, 14.458699176745053], [73.30922240974836, 15.29078789187282], [72.81202430761256, 16.119261469086165], [72.28986426086776, 16.938194128772622], [71.74516203812404, 17.741660091319705], [71.18033740799146, 18.523733577114946], [70.59781013908008, 19.27848880654587], [70, 20], [69.38690076964483, 20.681582068739417], [68.7453543082186, 21.338262707011385], [68.07878659656924, 21.972581445512926], [67.39062361554464, 22.587077814941033], [66.68429134599272, 23.18429134599272], [65.96321576876137, 23.766761569364988], [65.23082286469852, 24.337028015754846], [64.49053861465208, 24.897630215859294], [63.74578899946994, 25.451107700375346], [63.00000000000001, 25.999999999999993]]
+        },
+        {
+          "actor": "puck",
+          "style": "pass",
+          "to": [63.00000000000001, 25.999999999999996],
+          "speed": 52.9,
+          "receiver": "P"
+        }
+      ],
+      "name": "Give and go",
+      "notes": "The receiver executes a give and go with the point man, who steps off the point into the slot."
+    },
+    {
+      "moves": [
+        {
+          "actor": "P",
+          "style": "skate-puck",
+          "points": [[63.00000000000001, 25.999999999999993], [62.23888218813871, 26.549806378766803], [61.464300217249665, 27.091047543571086], [60.67806296462339, 27.622784918084896], [59.88197930755039, 28.144079925980282], [59.077858123321185, 28.653993990929276], [58.26750828922628, 29.151588536603935], [57.452738682556195, 29.63592498667629], [56.63535818060145, 30.106064764818388], [55.81717566065254, 30.56106929470228], [55, 31], [54.1094384499277, 31.454051531852993], [53.190660153989775, 31.894789832635563], [52.25593721696971, 32.320938861060306], [51.317541743651006, 32.73122257583982], [50.387745838817146, 33.12436493568671], [49.478821607251625, 33.499089899313574], [48.60304115373793, 33.85412142543301], [47.77267658305956, 34.18818347275762], [47, 34.5], [46.1159421039942, 34.84994569174967], [45.30543486699348, 35.15618890321837], [44.53695657799565, 35.43745926881225], [43.77898552599855, 35.71248642293742], [43.00000000000001, 36]],
+          "speed": 25
+        }
+      ]
+    },
+    {
+      "moves": [
+        { "actor": "puck", "style": "shoot", "to": [11, 42.5] }
+      ],
+      "name": "Shoot",
+      "notes": "The point man shoots. The player who attacked becomes the new point man."
+    }
+  ]
+}
