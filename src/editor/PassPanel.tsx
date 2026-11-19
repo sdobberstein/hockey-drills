@@ -42,7 +42,7 @@ export function PassPanel({ drill, link, onEdit }: Props) {
 
       {event.target.via && event.target.via.length > 0 && (
         <p className="hint">
-          Banked off the boards ({event.target.via.length} {event.target.via.length === 1 ? 'bounce' : 'bounces'}).{' '}
+          Banked off the boards ({event.target.via.length} {event.target.via.length === 1 ? 'bounce' : 'bounces'}). Drag a dot to slide it along the wall; double-click one to remove it.{' '}
           <button type="button" onClick={() => onEdit((f) => clearBank(f, link))}>
             Make it straight
           </button>

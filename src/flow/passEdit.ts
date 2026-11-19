@@ -1,5 +1,6 @@
 import { distance, nearestAlongPath, pathLength, pointAlong } from '../engine/geometry'
 import type { MoveStyle, Point } from '../engine/types'
+import { nearestBoard } from '../render/rinkGeometry'
 import type { Starts } from './edit'
 import { MAX_PASS_SPEED, MIN_PASS_SPEED, RELEASE_STYLES } from '../editor/releases'
 import { markerTime, segmentsFor } from './timeline'
@@ -216,4 +217,27 @@ export function clearBank(flow: Flow, index: number): Flow {
   if (!e || !e.target.via) return flow
   const { via: _via, ...target } = e.target
   return { ...flow, events: flow.events.map((x, i) => (i === index ? { ...x, target } : x)) }
+}
+
+/**
+ * Move one bounce of a banked pass. The bounce stays on the boards: wherever it is dragged to, it
+ * snaps to the nearest wall, rounded to a tenth of a foot (finer than a hand can place). Nothing
+ * else about the pass changes; its speed is solved again from the new route when the flow is compiled.
+ */
+export function moveBounce(flow: Flow, event: number, index: number, to: Point): Flow {
+  const e = flow.events[event]
+  if (!e?.target.via?.[index]) return flow
+  const board = nearestBoard(to).point
+  const bounce: Point = [Math.round(board[0] * 10) / 10, Math.round(board[1] * 10) / 10]
+  const via = e.target.via.map((p, i) => (i === index ? bounce : p))
+  return { ...flow, events: flow.events.map((x, i) => (i === event ? { ...x, target: { ...e.target, via } } : x)) }
+}
+
+/** Remove one bounce of a banked pass. Removing the last one makes it a straight pass. */
+export function removeBounce(flow: Flow, event: number, index: number): Flow {
+  const e = flow.events[event]
+  if (!e?.target.via?.[index]) return flow
+  const via = e.target.via.filter((_, i) => i !== index)
+  if (via.length === 0) return clearBank(flow, event)
+  return { ...flow, events: flow.events.map((x, i) => (i === event ? { ...x, target: { ...e.target, via } } : x)) }
 }

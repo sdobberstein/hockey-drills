@@ -8,7 +8,7 @@ import { compileFlow } from './compile'
 import type { Starts } from './edit'
 import { drillToFlow } from './import'
 import { appendRun } from './pathEdit'
-import { clearBank, addPass, believable, endMarker, explain, followers, landingZones, locateOnPath, removePass, setPassSpeed, setPassStyle, snapToLanding } from './passEdit'
+import { moveBounce, removeBounce, clearBank, addPass, believable, endMarker, explain, followers, landingZones, locateOnPath, removePass, setPassSpeed, setPassStyle, snapToLanding } from './passEdit'
 import { segmentsFor } from './timeline'
 import { buildTimelineModel, carrierAtTime, firstPossession, puckCarriedBy } from './view'
 import type { Flow } from './types'
@@ -455,5 +455,46 @@ describe('clearing a bank', () => {
     const cleared = clearBank(flow, 0)
     expect(cleared.events[0].target).toEqual({ kind: 'point', at: [20, 40] })
     expect(clearBank(cleared, 0)).toBe(cleared)
+  })
+})
+
+describe('moving and removing the bounces of a banked pass', () => {
+  const banked = () => ({
+    paths: {},
+    events: [
+      { puck: 'puck', style: 'pass' as const, from: { actor: 'F1', piece: 0, at: 0 }, target: { kind: 'point' as const, at: [20, 40] as [number, number], via: [[60, 0], [30, 85]] as [number, number][] } },
+      { puck: 'puck', style: 'pass' as const, from: { after: 0 }, target: { kind: 'point' as const, at: [90, 40] as [number, number] } },
+    ],
+  })
+
+  it('snaps a dragged bounce onto the nearest wall, leaving the other bounce and passes alone', () => {
+    const moved = moveBounce(banked(), 0, 0, [80, 6])
+    expect(moved.events[0].target.via).toEqual([[80, 0], [30, 85]])
+    expect(moved.events[1]).toEqual(banked().events[1])
+  })
+
+  it('snaps a bounce dragged far out onto the boards rather than leaving it on the ice', () => {
+    const moved = moveBounce(banked(), 0, 1, [100, 70]) // closer to the bottom wall (15 ft) than the top
+    expect(moved.events[0].target.via![1]).toEqual([100, 85])
+  })
+
+  it('follows the rounded corner', () => {
+    const [x, y] = moveBounce(banked(), 0, 0, [6, 6]).events[0].target.via![0]
+    expect(Math.hypot(x - 28, y - 28)).toBeCloseTo(28, 0) // on the arc centred at (28, 28)
+  })
+
+  it('does nothing for a bounce that is not there', () => {
+    const flow = banked()
+    expect(moveBounce(flow, 0, 5, [50, 0])).toBe(flow)
+    expect(moveBounce(flow, 1, 0, [50, 0])).toBe(flow) // a straight pass has none
+    expect(moveBounce(flow, 9, 0, [50, 0])).toBe(flow)
+  })
+
+  it('removes one bounce, and the last one makes the pass straight', () => {
+    const one = removeBounce(banked(), 0, 0)
+    expect(one.events[0].target.via).toEqual([[30, 85]])
+    const none = removeBounce(one, 0, 0)
+    expect(none.events[0].target).toEqual({ kind: 'point', at: [20, 40] })
+    expect('via' in none.events[0].target).toBe(false)
   })
 })

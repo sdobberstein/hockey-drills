@@ -22,6 +22,12 @@ export interface VertexGrab {
   insertAt?: Point
 }
 
+/** A grab of one bounce of the selected banked pass: the pass (its number in the order they happen) and which bounce. */
+export interface BounceGrab {
+  link: number
+  index: number
+}
+
 export type StagePhase = 'start' | 'move' | 'end'
 
 /** What a click landed on while a pass tool is chosen. */
@@ -69,6 +75,9 @@ interface Props {
   onFinishDrawing: () => void
   onVertex: (grab: VertexGrab, to: Point, phase: StagePhase) => void
   onVertexRemove: (actor: string, piece: number, index: number) => void
+  /** Drag a bounce of the selected banked pass; it snaps to the boards. */
+  onBounce: (grab: BounceGrab, to: Point, phase: StagePhase) => void
+  onBounceRemove: (grab: BounceGrab) => void
 }
 
 const GRAB_RADIUS = 4
@@ -89,6 +98,7 @@ export function FlowStage(props: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const grab = useRef<{ id: string; dx: number; dy: number } | null>(null)
   const vertex = useRef<VertexGrab | null>(null)
+  const bounce = useRef<BounceGrab | null>(null)
   const [cursor, setCursor] = useState<Point | null>(null)
 
   const toFeet = (e: { clientX: number; clientY: number }): Point => {
@@ -138,16 +148,32 @@ export function FlowStage(props: Props) {
         else props.onSelect(null)
       }}
       onPointerMove={(e) => {
-        if (vertex.current) props.onVertex(vertex.current, toFeet(e), 'move')
+        if (bounce.current) props.onBounce(bounce.current, toFeet(e), 'move')
+        else if (vertex.current) props.onVertex(vertex.current, toFeet(e), 'move')
         else if (drawingNow || passFrom) setCursor(toFeet(e))
       }}
       onPointerUp={(e) => {
+        if (bounce.current) {
+          props.onBounce(bounce.current, toFeet(e), 'end')
+          bounce.current = null
+          return
+        }
         if (!vertex.current) return
         props.onVertex(vertex.current, toFeet(e), 'end')
         vertex.current = null
       }}
-      onDoubleClick={() => {
-        if (drawingNow) props.onFinishDrawing()
+      onDoubleClick={(e) => {
+        if (drawingNow) {
+          props.onFinishDrawing()
+          return
+        }
+        // A bounce handle captures the pointer so a drag can leave the dot, which sends the
+        // double-click here instead of to the dot. So find the bounce under it by position.
+        if (selection?.kind !== 'pass') return
+        const at = toFeet(e)
+        const via = flow.events[selection.link]?.target.via ?? []
+        const hit = via.findIndex(([x, y]) => Math.hypot(x - at[0], y - at[1]) <= GRAB_RADIUS)
+        if (hit >= 0) props.onBounceRemove({ link: selection.link, index: hit })
       }}
     >
       <Rink />
@@ -251,6 +277,27 @@ export function FlowStage(props: Props) {
           </g>
         )
       })}
+
+      {/* Handles on the bounces of the selected banked pass: drag along the wall, double-click to remove. */}
+      {selection?.kind === 'pass' &&
+        (flow.events[selection.link]?.target.via ?? []).map(([x, y], i) => (
+          <circle
+            key={`b${selection.link}-${i}`}
+            cx={x}
+            cy={y}
+            r={1.5}
+            fill={ACCENT}
+            stroke="#fff"
+            strokeWidth={0.4}
+            style={{ cursor: 'grab' }}
+            onPointerDown={(e) => {
+              e.stopPropagation()
+              svgRef.current!.setPointerCapture(e.pointerId)
+              bounce.current = { link: selection.link, index: i }
+              props.onBounce(bounce.current, toFeet(e), 'start')
+            }}
+          />
+        ))}
 
       {/* A halo under the selected run. */}
       {selectedSeg && selectedRun && (

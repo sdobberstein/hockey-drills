@@ -11,7 +11,7 @@ import { moveLanding, moveRelease, removeWait, setRunSeconds, setWaitSeconds, ty
 import { drillToFlow } from '../flow/import'
 import { appendRun, pathEnd, removeRun, setRunPoints } from '../flow/pathEdit'
 import { addPickup, bestPickup, looseSpots, pickupZones, removePickup, type LooseSpot } from '../flow/pickupEdit'
-import { addPass, believable, endMarker, explain, followers, landingZones, locateOnPath, removePass, snapToLanding } from '../flow/passEdit'
+import { addPass, believable, endMarker, explain, followers, landingZones, locateOnPath, moveBounce, removeBounce, removePass, snapToLanding } from '../flow/passEdit'
 import { pointAlong } from '../engine/geometry'
 import { buildTimelineModel, firstPossession, mergedFlights, NO_PUCK_MESSAGE, puckCarriedBy, whyNoPuck } from '../flow/view'
 import type { After, EventTarget, Marker } from '../flow/types'
@@ -27,7 +27,7 @@ import { PiecePanel } from './PiecePanel'
 import { deleteDraft, loadDraft } from './drafts'
 import { DetailsPanel } from './DetailsPanel'
 import { EditStage } from './EditStage'
-import { FlowStage, type PassClick, type StagePhase, type VertexGrab } from './FlowStage'
+import { FlowStage, type BounceGrab, type PassClick, type StagePhase, type VertexGrab } from './FlowStage'
 import { addActor, deleteActor, moveActor } from './ops'
 import { nearestBoard } from '../render/rinkGeometry'
 import { clampToRink } from './rink'
@@ -441,6 +441,9 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
     if (phase === 'start' && g.insertAfter !== undefined) timelineDrag('move', edit)
   }
 
+  /** Drag one bounce of the selected banked pass along the boards. */
+  const stageBounce = (g: BounceGrab, to: Point, phase: StagePhase) => timelineDrag(phase, (f) => moveBounce(f, g.link, g.index, to))
+
   const timelineDrag = (phase: DragPhase, edit: (flow: Flow, starts: Starts) => Flow | null) => {
     if (phase === 'start') dragBase.current = drill
     else if (phase === 'end') {
@@ -640,6 +643,8 @@ function Editor({ initial, inLibrary }: { initial: Drill; inLibrary: boolean }) 
               onDrawPoint={(at) => setDrawing((d) => (d ? { ...d, points: [...d.points, clampToRink(at)] } : d))}
               onFinishDrawing={finish}
               onVertex={stageVertex}
+              onBounce={stageBounce}
+              onBounceRemove={(g) => flowEdit((f) => removeBounce(f, g.link, g.index))}
               onVertexRemove={(actor, piece, index) =>
                 flowEdit((f, s) => {
                   const run = f.paths[actor]?.[piece]
