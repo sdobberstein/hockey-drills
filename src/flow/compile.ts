@@ -315,7 +315,10 @@ function emitRun(actor: string, seg: Segment, tA: number, tB: number, carries: b
   const s1 = Math.min((tB - seg.t0) * seg.speed, seg.length)
   if (s1 - s0 < 1e-6) return null
 
-  const whole = s0 <= 1e-3 && s1 >= seg.length - 1e-3
+  // Whole means the step covers the run, to the same tolerance boundaries are merged with. Comparing
+  // in feet instead (a thousandth) disagreed with that: a run ending 4 ms inside a merged boundary
+  // was treated as cut, and lost its compact points and smooth flag for a dense curve.
+  const whole = tA - seg.t0 <= MERGE && seg.t1 - tB <= MERGE
   let points: Point[]
   let smooth = false
   if (whole) {

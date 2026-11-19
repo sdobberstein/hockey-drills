@@ -281,3 +281,23 @@ describe('cutting a smooth run', () => {
     expect(drill.steps.length).toBeGreaterThan(1)
   })
 })
+
+describe('a run that a step covers to within the merge tolerance', () => {
+  it('keeps its own points and smooth flag, not a dense copy of the curve', () => {
+    // F2's run ends 3 ms before F1's smooth run does: the two boundaries merge, and F1's run is still whole.
+    const d = base()
+    d.actors = [
+      { id: 'F1', type: 'forward', start: [20, 20] },
+      { id: 'F2', type: 'forward', start: [50, 60] },
+    ]
+    const smooth: Flow['paths'][string] = [{ kind: 'run', style: 'skate', smooth: true, speed: 25, points: [[20, 20], [60, 40], [100, 20]] }]
+    const seconds = segmentsFor(smooth, [20, 20])[0].t1
+    const f: Flow = {
+      paths: { F1: smooth, F2: [{ kind: 'run', style: 'skate', speed: 25, points: [[50, 60], [50 + (seconds - 0.003) * 25, 60]] }] },
+      events: [],
+    }
+    const move = compileFlow(d, f).drill.steps.flatMap((s) => s.moves).find((m) => m.actor === 'F1')!
+    expect(move.smooth).toBe(true)
+    expect(move.points).toHaveLength(3)
+  })
+})
